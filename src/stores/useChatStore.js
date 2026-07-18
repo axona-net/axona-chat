@@ -168,6 +168,11 @@ export const useChatStore = create((set, get) => ({
 
   addAdvertisement: (ad) => {
     // ad = { name, blurb, topicId, network, region, mode, postedAt }
+    // Sunset policy: spaced topic names break plain-text links and are
+    // deprecated — drop their ads at ingest so neither the ticker nor the
+    // browse panel resurfaces them. (Ads can't be retracted by anyone but
+    // their signer; this is the app-side lever.)
+    if (/\s/.test(ad?.name || '')) return;
     set(state => {
       const filtered = state.advertisedTopics.filter(item => item.topicId !== ad.topicId);
       return { advertisedTopics: [...filtered, ad] };

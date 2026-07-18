@@ -256,7 +256,7 @@ The topic header shows a live message count ("📊 N messages") by subscribing t
 
 ## 13. Discovery: The Ticker
 
-One app-recognized open topic (`advertised-topics`, `useast`) renders as the **DISCOVER** tape across the top. **DISCOVER itself is a button**: pressing it opens a scrollable browse panel listing every currently-held advertisement, newest first — topic name, mode chip, and blurb — with the entire row a click target that joins and opens the topic. The tape is ambient discovery; the panel is deliberate browsing; both draw from the same advertisements. Every ordinary topic carries an **Advertise** control prompting for a short blurb and publishing a `topic.ad` record:
+One app-recognized open topic (`advertised-topics`, `useast`) renders as the **DISCOVER** tape across the top. Ads whose topic name contains whitespace are **dropped at ingest** — spaced names are sunset (§5.3), and since an ad can only be retracted by its signer, the client-side filter is how deprecated ads disappear for users. **DISCOVER itself is a button**: pressing it opens a scrollable browse panel listing every currently-held advertisement, newest first — topic name, mode chip, and blurb — with the entire row a click target that joins and opens the topic. The tape is ambient discovery; the panel is deliberate browsing; both draw from the same advertisements. Every ordinary topic carries an **Advertise** control prompting for a short blurb and publishing a `topic.ad` record:
 
 ```json
 {
