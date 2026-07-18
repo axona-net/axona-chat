@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 
-// Helper to compute stable IDs for topics
+// Helper to compute stable IDs for topics.
+// write defaults to 'open' to MATCH THE KERNEL: deriveTopicId treats a
+// missing write policy as 'open', so {name:'lobby'} and {name:'lobby',
+// write:'open'} are the same topic on the network and must be the same
+// row here (an ad carries write explicitly; the defaults omit it).
 const getTopicId = (descriptor) => {
   if (!descriptor) return '';
-  // Topic descriptor contains region, owner, name, write
   const region = descriptor.region || 'global';
   const owner = descriptor.owner || '';
   const name = descriptor.name || '';
-  const write = descriptor.write || '';
+  const write = descriptor.write || 'open';
   return `${region}:${owner}:${name}:${write}`;
 };
 
@@ -27,18 +30,31 @@ const loadPersistedTopics = () => {
   try {
     const raw = localStorage.getItem('axona-topics');
     const parsed = raw ? JSON.parse(raw) : null;
-    if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(t => t && t.name)) {
+    let parsedDeduped = parsed;
+    if (Array.isArray(parsed)) {
+      // Heal duplicates persisted before write-policy normalization
+      // (same kernel topic under two descriptor spellings).
+      const seen = new Set();
+      parsedDeduped = parsed.filter(t => {
+        const id = getTopicId(t);
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+      if (parsedDeduped.length !== parsed.length) persistTopics(parsedDeduped);
+    }
+    if (Array.isArray(parsedDeduped) && parsedDeduped.length > 0 && parsedDeduped.every(t => t && t.name)) {
       // One-time seed: existing users get the axona topic prepended once.
       // The flag keeps a deliberate unsubscribe from being re-added.
       if (!localStorage.getItem('axona-topic-seeded')) {
         localStorage.setItem('axona-topic-seeded', '1');
-        if (!parsed.some(t => getTopicId(t) === getTopicId(AXONA_TOPIC))) {
-          const seeded = [AXONA_TOPIC, ...parsed];
+        if (!parsedDeduped.some(t => getTopicId(t) === getTopicId(AXONA_TOPIC))) {
+          const seeded = [AXONA_TOPIC, ...parsedDeduped];
           persistTopics(seeded);
           return seeded;
         }
       }
-      return parsed;
+      return parsedDeduped;
     }
   } catch { /* corrupted or unavailable storage → defaults */ }
   try { localStorage.setItem('axona-topic-seeded', '1'); } catch { /* ignore */ }
@@ -54,7 +70,7 @@ const persistTopics = (topics) => {
 export const useChatStore = create((set, get) => ({
   // Active states
   activeTopic: { region: 'useast', name: 'lobby' }, // Default open channel
-  activeTopicId: 'useast::lobby:',
+  activeTopicId: 'useast::lobby:open',
 
   // Channels/Topics list
   subscribedTopics: loadPersistedTopics(),

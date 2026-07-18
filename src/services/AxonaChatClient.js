@@ -2,12 +2,16 @@ import { deriveTopicId, createAuthorIdentity, metricTopic } from '@axona/protoco
 import { makeMessage } from '@axona/protocol/std/message.js';
 import { useChatStore } from '../stores/useChatStore.js';
 import CryptoService from './CryptoService.js';
+// write defaults to 'open' to match the kernel's deriveTopicId — a
+// descriptor with and without an explicit write:'open' is the same topic
+// and must map to the same store id (must stay in sync with the copy in
+// useChatStore.js).
 const getTopicId = (descriptor) => {
   if (!descriptor) return '';
   const region = descriptor.region || 'global';
   const owner = descriptor.owner || '';
   const name = descriptor.name || '';
-  const write = descriptor.write || '';
+  const write = descriptor.write || 'open';
   return `${region}:${owner}:${name}:${write}`;
 };
 

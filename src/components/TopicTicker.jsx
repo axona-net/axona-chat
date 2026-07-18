@@ -57,7 +57,9 @@ const TopicTicker = () => {
       padding: '0.4rem 1rem',
       background: 'var(--color-surface)',
       borderBottom: '1px solid var(--border-color)',
-      overflow: 'hidden',
+      // NO overflow:hidden here — the DISCOVER browse panel drops below this
+      // bar via position:absolute and would be clipped invisible. The
+      // scrolling ticker strip clips itself (its own overflow:hidden below).
       position: 'relative',
       fontSize: '0.8rem',
       gap: '1rem'
