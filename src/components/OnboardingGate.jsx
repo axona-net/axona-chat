@@ -95,19 +95,37 @@ const OnboardingGate = ({ children }) => {
             Axona is a serverless, peer-to-peer chat. To begin, create or import a handle. Your cryptographic keys will be stored locally.
           </p>
 
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-            <button 
-              onClick={() => { setMode('create'); setError(''); }} 
-              style={{ flex: 1, background: mode === 'create' ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)' }}
-            >
-              Generate New
-            </button>
-            <button 
-              onClick={() => { setMode('import'); setError(''); }} 
-              style={{ flex: 1, background: mode === 'import' ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)' }}
-            >
-              Import Handle
-            </button>
+          {/* Mode tabs: two separate paths into the app — create a fresh
+              identity, or bring an existing one. Underline-tab styling so
+              they read as switchable views, not sibling actions. */}
+          <div style={{ display: 'flex', marginBottom: '1.5rem', borderBottom: '2px solid var(--border-color)' }}>
+            {[
+              { key: 'create', label: 'Create new identity' },
+              { key: 'import', label: 'Import existing' }
+            ].map(tab => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => { setMode(tab.key); setError(''); }}
+                style={{
+                  flex: 1,
+                  padding: '0.65rem 0.5rem',
+                  cursor: 'pointer',
+                  fontWeight: mode === tab.key ? '700' : '500',
+                  fontSize: '0.9rem',
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 0,
+                  borderBottom: mode === tab.key
+                    ? '3px solid var(--color-primary)'
+                    : '3px solid transparent',
+                  color: mode === tab.key ? 'var(--color-primary)' : 'var(--color-muted)',
+                  marginBottom: '-2px'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
@@ -241,7 +259,7 @@ const OnboardingGate = ({ children }) => {
                 marginTop: '0.5rem'
               }}
             >
-              {isLoading ? 'Processing...' : mode === 'create' ? 'Generate Identity' : 'Import'}
+              {isLoading ? 'Processing...' : 'Continue'}
             </button>
           </form>
         </div>
