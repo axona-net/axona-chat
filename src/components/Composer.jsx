@@ -502,7 +502,7 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
                   }} 
                   style={{
                     padding: '0.4rem 1.2rem',
-                    background: 'var(--color-primary-light)',
+                    background: 'var(--color-primary)',
                     color: '#fff',
                     fontWeight: '600',
                     borderRadius: 'var(--radius)',

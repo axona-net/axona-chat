@@ -14,8 +14,10 @@ const getTopicId = (descriptor) => {
 // Subscribed topics persist locally so a returning user's full list is
 // resurrected on rejoin. Descriptors are plain JSON (including any private
 // channel's local key — consistent with handles' keys living in local
-// storage). Falls back to the three default rooms on first run.
+// storage). Falls back to the four default rooms on first run.
+const AXONA_TOPIC = { region: 'useast', name: 'axona', description: 'talk to us' };
 const DEFAULT_TOPICS = [
+  AXONA_TOPIC,
   { region: 'useast', name: 'lobby', description: 'Public lobby for everyone' },
   { region: 'useast', name: 'tech', description: 'Tech discussions' },
   { region: 'useast', name: 'general', description: 'General chat' }
@@ -26,9 +28,20 @@ const loadPersistedTopics = () => {
     const raw = localStorage.getItem('axona-topics');
     const parsed = raw ? JSON.parse(raw) : null;
     if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(t => t && t.name)) {
+      // One-time seed: existing users get the axona topic prepended once.
+      // The flag keeps a deliberate unsubscribe from being re-added.
+      if (!localStorage.getItem('axona-topic-seeded')) {
+        localStorage.setItem('axona-topic-seeded', '1');
+        if (!parsed.some(t => getTopicId(t) === getTopicId(AXONA_TOPIC))) {
+          const seeded = [AXONA_TOPIC, ...parsed];
+          persistTopics(seeded);
+          return seeded;
+        }
+      }
       return parsed;
     }
   } catch { /* corrupted or unavailable storage → defaults */ }
+  try { localStorage.setItem('axona-topic-seeded', '1'); } catch { /* ignore */ }
   return DEFAULT_TOPICS;
 };
 

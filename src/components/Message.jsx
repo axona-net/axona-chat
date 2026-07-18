@@ -1,13 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useChatStore } from '../stores/useChatStore.js';
 import AxonaChatClient from '../services/AxonaChatClient.js';
 import LinkPreview from './LinkPreview.jsx';
 
+// Long-message panel height: comfortably smaller than the viewport so a
+// single message can never dominate the list. Pages advance by slightly
+// less than the panel height so a line clipped at one page's bottom edge
+// reappears whole at the top of the next.
+const PAGE_H = Math.min(360, Math.round(window.innerHeight * 0.45));
+const PAGE_STEP = PAGE_H - 28;
+
 const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) => {
   const { msgId, signerPubkey, ts } = envelope;
   const payload = envelope.message;
   const { currentHandle } = useChatStore();
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // Long-message paging: content taller than PAGE_H renders inside a
+  // fixed-height panel stepped with Previous/Next — deliberately NOT an
+  // inner scrollbar, which would fight the message list's own scrolling.
+  const contentRef = useRef(null);
+  const [pageCount, setPageCount] = useState(1);
+  const [page, setPage] = useState(0);
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = el.scrollHeight;
+      // Small tolerance so a message barely over the limit isn't paged.
+      const pages = h > PAGE_H + 60 ? 1 + Math.ceil((h - PAGE_H) / PAGE_STEP) : 1;
+      setPageCount(pages);
+      setPage(p => Math.min(p, pages - 1));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);   // re-measure as embeds load
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   if (!payload) return null;
 
@@ -34,8 +64,6 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
 
   const isOwn = currentHandle && signerPubkey === currentHandle.authorId;
   const formattedTime = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  const [showConfirm, setShowConfirm] = useState(false);
 
   // Handle Delete (Kill message)
   const handleDelete = async () => {
@@ -166,20 +194,58 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
         </span>
       </div>
 
-      <div className="message-content" style={{ fontSize: '0.9rem', lineHeight: '1.4', wordBreak: 'break-word', color: 'var(--color-text)' }}>
-        <ReactMarkdown
-          components={{
-            a: ({ href, children }) => (
-              <a href={href} target="_blank" rel="noopener noreferrer">
-                {children}
-              </a>
-            )
+      <div style={pageCount > 1 ? { height: `${PAGE_H}px`, overflow: 'hidden' } : undefined}>
+        <div
+          ref={contentRef}
+          className="message-content"
+          style={{
+            fontSize: '0.9rem', lineHeight: '1.4', wordBreak: 'break-word', color: 'var(--color-text)',
+            transform: pageCount > 1 ? `translateY(-${page * PAGE_STEP}px)` : undefined,
+            transition: 'transform 0.2s ease'
           }}
         >
-          {displayText}
-        </ReactMarkdown>
-        {renderEmbeds(displayText)}
+          <ReactMarkdown
+            components={{
+              a: ({ href, children }) => (
+                <a href={href} target="_blank" rel="noopener noreferrer">
+                  {children}
+                </a>
+              )
+            }}
+          >
+            {displayText}
+          </ReactMarkdown>
+          {renderEmbeds(displayText)}
+        </div>
       </div>
+
+      {pageCount > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', marginTop: '0.35rem', fontSize: '0.72rem' }}>
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+            style={{
+              padding: '0.15rem 0.6rem', borderRadius: '4px', cursor: page === 0 ? 'default' : 'pointer',
+              border: '1px solid var(--border-color)', background: 'transparent',
+              color: page === 0 ? 'var(--color-muted)' : 'var(--color-primary)', fontWeight: '600'
+            }}
+          >
+            ◀ Previous
+          </button>
+          <span style={{ color: 'var(--color-muted)' }}>{page + 1} / {pageCount}</span>
+          <button
+            onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
+            disabled={page >= pageCount - 1}
+            style={{
+              padding: '0.15rem 0.6rem', borderRadius: '4px', cursor: page >= pageCount - 1 ? 'default' : 'pointer',
+              border: '1px solid var(--border-color)', background: 'transparent',
+              color: page >= pageCount - 1 ? 'var(--color-muted)' : 'var(--color-primary)', fontWeight: '600'
+            }}
+          >
+            Next ▶
+          </button>
+        </div>
+      )}
 
       {/* Action Footer */}
       <div style={{ display: 'flex', gap: '1rem', marginTop: '0.2rem', justifyContent: 'flex-end', fontSize: '0.7rem' }}>

@@ -25,8 +25,10 @@ const OnboardingGate = ({ children }) => {
     setLocState('requesting');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        // Round to ~1 decimal (≈11 km): enough to seed the node's regional
-        // placement, coarse enough to not be a precise location record.
+        // The network only uses this to pick the node's REGION — one of
+        // ~190 large cells covering the globe, each spanning hundreds of
+        // kilometers. We additionally round the stored coordinate to one
+        // decimal so nothing precise is ever kept.
         const lat = Math.round(pos.coords.latitude * 10) / 10;
         const lng = Math.round(pos.coords.longitude * 10) / 10;
         try { localStorage.setItem('axona-node-location', JSON.stringify({ lat, lng })); } catch { /* ignore */ }
@@ -190,7 +192,8 @@ const OnboardingGate = ({ children }) => {
             {/* Location — improves the node's network placement; coarse only */}
             <div>
               <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.25rem' }}>
-                Location (places your node in a nearby network region — stored coarsely, ~11 km)
+                Location — used only to place your node in a broad network region
+                (regions span hundreds of kilometers; no precise location is kept)
               </label>
               {locState === 'granted' ? (
                 <div style={{ fontSize: '0.8rem', color: 'var(--color-success, #2ecc71)', fontWeight: '600' }}>✓ Location set</div>
@@ -231,7 +234,7 @@ const OnboardingGate = ({ children }) => {
               type="submit"
               disabled={isLoading}
               style={{
-                background: 'var(--color-primary-light)',
+                background: 'var(--color-primary)',
                 color: '#fff',
                 padding: '0.75rem',
                 fontWeight: '600',

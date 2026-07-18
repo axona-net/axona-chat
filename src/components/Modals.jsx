@@ -601,7 +601,7 @@ const selectStyle = {
 };
 
 const btnStyle = {
-  background: 'var(--color-primary-light)',
+  background: 'var(--color-primary)',
   color: '#fff',
   padding: '0.75rem',
   fontWeight: '600',
