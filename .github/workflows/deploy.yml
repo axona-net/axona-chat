@@ -26,7 +26,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci
+      # --legacy-peer-deps: @testing-library/react@14 predates react 19; the
+      # dev tree installs the same way. Runtime deps are unaffected.
+      - run: npm ci --legacy-peer-deps
       - run: npm run build
       - uses: actions/configure-pages@v5
         with:
