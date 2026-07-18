@@ -374,6 +374,7 @@ This section is normative. A protocol operation named in prose elsewhere in this
 - **PWA, client-only, no SSR** (§2.3). Production serves over HTTPS on a real host, where the `::1` issue does not apply.
 - **Hosting:** the app deploys as a static bundle (GitHub Pages) fronted by the custom domain **axona.chat**, built with base `/` (served at the domain root). Share/QR links derive from `origin + pathname`, so they follow whatever host the app is served from.
 - **Link preview:** `index.html` carries full Open Graph + Twitter Card metadata (absolute `og:image` URL, `summary_large_image`) with a 1200×630 branded card at `public/og-image.png`, so sharing https://axona.chat unfurls properly in messengers and social clients. The card is generated from an HTML source rendered by headless Chrome — regenerate it the same way if the branding changes rather than editing the PNG. Crawlers cache aggressively; expect stale previews on links shared before a card change.
+- **Brand mark:** the Axona **ant** (source of truth: `axona-docs/images/AxonaLogo.png`) is the favicon (`public/favicon.png`, 128px), the apple-touch icon (180px), and the mark on the link-preview card. The card and `theme-color` use the app's warm palette (charcoal `#1C1A18`, rust `#E07A64`), matching §14 theming — not any third-party or scaffold branding.
 
 ---
 
