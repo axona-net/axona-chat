@@ -1,10 +1,27 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useChatStore } from '../stores/useChatStore.js';
 import Message from './Message.jsx';
+import AxonaChatClient from '../services/AxonaChatClient.js';
 
 const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => {
   const { activeTopic, activeTopicId, messages, currentHandle, moderationQueue, topicMetrics } = useChatStore();
+  const advertisedTopics = useChatStore(s => s.advertisedTopics);
   const messagesEndRef = useRef(null);
+
+  // ONE advertisement per topic. Ads carry the kernel-derived hex topic id,
+  // so compare against the active topic's hex id (same derivation the network
+  // uses — immune to region-name spelling like useast vs its canonical name).
+  // Retracting/expiring the ad removes it from the store → button re-enables.
+  const [activeHexId, setActiveHexId] = useState(null);
+  useEffect(() => {
+    let stale = false;
+    setActiveHexId(null);
+    AxonaChatClient.getTopicHexId(activeTopic)
+      .then((id) => { if (!stale) setActiveHexId(id); })
+      .catch(() => { if (!stale) setActiveHexId(null); });
+    return () => { stale = true; };
+  }, [activeTopicId]);
+  const alreadyAdvertised = !!activeHexId && advertisedTopics.some(ad => ad.topicId === activeHexId);
 
   // Get envelopes for active topic
   const activeEnvelopes = messages[activeTopicId] || [];
@@ -149,18 +166,23 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
           {/* Advertise Button (not on the ticker itself) */}
           {activeTopic.name !== 'advertised-topics' && (
             <button
-              onClick={() => onOpenModal('advertise')}
-              title="Invite others in: this shares the topic on the DISCOVER ticker so anyone on the network can find it and join the conversation"
+              onClick={() => { if (!alreadyAdvertised) onOpenModal('advertise'); }}
+              disabled={alreadyAdvertised}
+              title={alreadyAdvertised
+                ? 'This topic is already on the DISCOVER ticker — one advertisement per topic. If the ad is yours, retract it there first to re-advertise'
+                : 'Invite others in: this shares the topic on the DISCOVER ticker so anyone on the network can find it and join the conversation'}
               style={{
                 fontSize: '0.75rem',
                 padding: '0.3rem 0.6rem',
                 background: 'var(--color-bg)',
                 border: '1px solid var(--border-color)',
-                color: 'var(--color-text)',
+                color: alreadyAdvertised ? 'var(--color-muted)' : 'var(--color-text)',
+                opacity: alreadyAdvertised ? 0.55 : 1,
+                cursor: alreadyAdvertised ? 'default' : 'pointer',
                 borderRadius: '4px'
               }}
             >
-              📢 Advertise
+              📢 {alreadyAdvertised ? 'Advertised' : 'Advertise'}
             </button>
           )}
 

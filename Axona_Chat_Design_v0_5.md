@@ -403,6 +403,7 @@ A build is correct when all of the following pass. They are ordered so that the 
 19. **Long-message paging:** a message several screens tall renders inside the fixed-height panel with working Previous/Next controls and a page indicator; it never grows an inner scrollbar; a short message shows no paging chrome.
 20. **Ad retraction:** A advertises a topic; the ✕ appears on that ad in A's browse panel but NOT in B's; A retracts through the two-step confirm; the ad disappears from DISCOVER on A *and* on B without either reloading.
 21. **Unread badges:** B posts to a topic A is subscribed to but not viewing — a badge with the count appears on that topic in A's rail and increments on further posts; A switches to the topic — the badge clears; A reloads — it stays cleared (watermark persisted); messages A posted never count.
+22. **One ad per topic:** with an ad for the active topic live on the ticker, the Advertise button reads "Advertised" and is disabled (grayed, explanatory tooltip); retracting that ad re-enables it. Comparison is by kernel-derived hex topic id, not descriptor spelling.
 
 ---
 
