@@ -1,0 +1,69 @@
+/* src/styles/theme.css */
+/* Premium dark‑mode theme for Axona Chat */
+
+:root {
+  /* Core palette – warm sepia dark theme base */
+  --color-bg: #1C1A18;          /* warm dark charcoal near-black */
+  --color-surface: #2C2926;     /* card paper equivalent */
+  --color-sidebar-bg: #24211E;  /* dark panel background */
+  --color-column-bg: transparent;
+  --color-primary: #E07A64;     /* glowing rust - headings, links, rules */
+  --color-primary-light: #E8AFA3;/* soft rust - subtle highlights */
+  --color-primary-dark: #A8422E;
+  --color-text: #E8E2DB;        /* warm light grey/ink-white */
+  --color-muted: #A69E97;       /* warm muted gray secondary text */
+  --border-color: rgba(244, 240, 236, 0.1);
+  --color-success: #5EAD7D;     /* glowing bridge-green success */
+  --color-success-bg: rgba(94, 173, 125, 0.08);
+  --glass-bg: rgba(44, 41, 38, 0.65);
+  --radius: 0.5rem;
+  --transition: 0.2s ease-out;
+}
+
+body.light-theme {
+  /* Core palette – light theme base */
+  --color-bg: #F7F4F0;          /* cream - warm page background */
+  --color-surface: #FFFFFF;     /* paper - plain-doc background */
+  --color-sidebar-bg: #F4F0EC;  /* panel - insets, cards, sidenotes */
+  --color-column-bg: transparent;
+  --color-primary: #B94E36;     /* rust - headings, links, rules */
+  --color-primary-light: #D4A896;/* rust-soft - subtle fills, highlights */
+  --color-primary-dark: #8c3825;
+  --color-text: #282624;        /* ink - body text, warm near-black */
+  --color-muted: #6E6964;       /* ink-muted - secondary text on cream */
+  --border-color: rgba(40, 38, 36, 0.12);
+  --color-success: #387650;     /* bridge-green */
+  --color-success-bg: rgba(56, 118, 80, 0.08);
+  --glass-bg: rgba(244, 240, 236, 0.85);
+}
+
+body.light-theme .glass {
+  background: var(--color-surface);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  backdrop-filter: none;
+}
+
+/* Glassmorphism utility class */
+.glass {
+  background: var(--glass-bg);
+  border-radius: var(--radius);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-color);
+}
+
+/* Micro‑animations */
+@keyframes rise {
+  from { transform: translateY(4px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Example usage:
+   .button:hover { animation: rise 0.2s ease-out; }
+*/

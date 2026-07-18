@@ -1,0 +1,481 @@
+import { deriveTopicId, createAuthorIdentity, metricTopic } from '@axona/protocol';
+import { makeMessage } from '@axona/protocol/std/message.js';
+import { useChatStore } from '../stores/useChatStore.js';
+import CryptoService from './CryptoService.js';
+const getTopicId = (descriptor) => {
+  if (!descriptor) return '';
+  const region = descriptor.region || 'global';
+  const owner = descriptor.owner || '';
+  const name = descriptor.name || '';
+  const write = descriptor.write || '';
+  return `${region}:${owner}:${name}:${write}`;
+};
+
+class AxonaChatClient {
+  constructor() {
+    this.peer = null;
+    this.activeSubscriptions = new Map(); // topicId -> sub handle
+    this.presenceInterval = null;
+    this.heartbeatTopic = { region: 'useast', name: 'axona-presence-heartbeats' };
+    this.tickerTopic = { region: 'useast', name: 'advertised-topics' };
+  }
+
+  setPeer(peer) {
+    this.peer = peer;
+    if (peer) {
+      this.reconcileSubscriptions();
+      this.startPresenceHeartbeat();
+    } else {
+      this.stopPresenceHeartbeat();
+    }
+  }
+
+  async getActiveAuthor() {
+    if (!this.peer) throw new Error('Peer not connected.');
+    const store = useChatStore.getState();
+    const handle = store.currentHandle;
+    if (!handle) {
+      throw new Error('No active handle selected.');
+    }
+    return await createAuthorIdentity({ persistAs: handle.authorRef });
+  }
+
+  // The protocol topic id IS the identity — an invalid descriptor must fail
+  // loudly, never be silently replaced by a made-up local id (which would
+  // diverge this client's bookkeeping from every other peer on the topic).
+  async getTopicHexId(descriptor) {
+    return await deriveTopicId(descriptor);
+  }
+
+  /**
+   * Sync subscriptions with the subscribed topics list from the store.
+   */
+  async reconcileSubscriptions() {
+    if (!this.peer) return;
+
+    const store = useChatStore.getState();
+    const topics = store.subscribedTopics;
+
+    // Build set of expected topic IDs
+    const expectedIds = new Set();
+    const idToTopic = new Map();
+
+    // Add normal channels
+    for (const t of topics) {
+      let id;
+      try {
+        id = await this.getTopicHexId(t);
+      } catch (e) {
+        console.error('Skipping invalid topic descriptor:', t, e);
+        continue;
+      }
+      expectedIds.add(id);
+      idToTopic.set(id, t);
+
+      // If it is moderated and we are the owner, we also subscribe to the raw channel
+      const isOwner = store.currentHandle && t.owner === store.currentHandle.authorId;
+      if (t.mode === 'moderated' && isOwner) {
+        const rawTopic = { region: t.region, name: t.name + ':raw', write: 'open' };
+        const rawId = await this.getTopicHexId(rawTopic);
+        expectedIds.add(rawId);
+        idToTopic.set(rawId, rawTopic);
+      }
+    }
+
+    // Add Ticker topic (always subscribed to in background)
+    const tickerId = await this.getTopicHexId(this.tickerTopic);
+    expectedIds.add(tickerId);
+    idToTopic.set(tickerId, this.tickerTopic);
+
+    // Add presence heartbeat topic
+    const presenceId = await this.getTopicHexId(this.heartbeatTopic);
+    expectedIds.add(presenceId);
+    idToTopic.set(presenceId, this.heartbeatTopic);
+
+    // Unsubscribe from removed topics
+    for (const [id, sub] of this.activeSubscriptions.entries()) {
+      const isMetrics = id.startsWith('metrics-');
+      const baseId = isMetrics ? id.replace('metrics-', '') : id;
+      if (!expectedIds.has(baseId)) {
+        sub.stop();
+        this.activeSubscriptions.delete(id);
+      }
+    }
+
+    // Subscribe to new topics
+    for (const id of expectedIds) {
+      if (!this.activeSubscriptions.has(id)) {
+        const topic = idToTopic.get(id);
+        this.subscribeTo(id, topic);
+      }
+    }
+  }
+
+  async subscribeTo(topicId, descriptor) {
+    if (!this.peer) return;
+
+    try {
+      const isTicker = descriptor.name === this.tickerTopic.name;
+      const isPresence = descriptor.name === this.heartbeatTopic.name;
+
+      const sub = await this.peer.sub(descriptor, (envelope) => {
+        if (envelope.deleted) {
+          useChatStore.getState().killMessage(getTopicId(descriptor), envelope.msgId);
+          return;
+        }
+
+        const payload = envelope.message;
+        const senderId = envelope.signerPubkey;
+
+        let processedPayload = payload;
+        
+        // Check if this topic has a privateKey for symmetric decryption
+        const topic = useChatStore.getState().subscribedTopics.find(t => getTopicId(t) === getTopicId(descriptor));
+        if (topic && topic.privateKey && payload && payload.ciphertext) {
+          const decrypted = CryptoService.decryptSymmetric(payload.ciphertext, topic.privateKey);
+          if (decrypted) {
+            processedPayload = {
+              ...payload,
+              isEncrypted: true,
+              decryptedText: decrypted
+            };
+          } else {
+            return; // Hide ciphertext if decryption fails
+          }
+        }
+
+        // Update presence / author cache. lastSeen must come from the
+        // envelope's publish timestamp — replayed history (since:'all')
+        // arrives NOW but was published hours ago; stamping arrival time
+        // would resurrect long-gone users as "online".
+        if (processedPayload && processedPayload.authorClass) {
+          useChatStore.getState().updatePresence(senderId, {
+            handle: processedPayload.handle || 'Anonymous',
+            declaration: processedPayload.authorClass,
+            lastSeen: envelope.ts
+          });
+        }
+
+        // Ticker delivery
+        if (isTicker) {
+          if (processedPayload && processedPayload.type === 'topic.ad') {
+            useChatStore.getState().addAdvertisement(processedPayload);
+          }
+          return;
+        }
+
+        // Presence delivery
+        if (isPresence) {
+          if (processedPayload && processedPayload.type === 'heartbeat') {
+            useChatStore.getState().updatePresence(senderId, {
+              handle: processedPayload.handle,
+              declaration: processedPayload.declaration,
+              lastSeen: envelope.ts
+            });
+          }
+          return;
+        }
+
+        // Private Encrypted Reply delivery
+        if (processedPayload && processedPayload.kind === 'encrypted-reply') {
+          const currentHandle = useChatStore.getState().currentHandle;
+          if (currentHandle) {
+            const decrypted = CryptoService.decryptAsRecipient(processedPayload.ciphertext, currentHandle.authorId);
+            if (decrypted) {
+              const reply = JSON.parse(decrypted);
+              // Store as decrypted message
+              useChatStore.getState().addEnvelope(getTopicId(descriptor), {
+                ...envelope,
+                message: {
+                  ...processedPayload,
+                  isEncrypted: true,
+                  decryptedText: reply.text,
+                  privateTopic: reply.privateTopic,
+                  privateKey: reply.privateKey
+                }
+              });
+
+              // If a private continuation topic was handed off, subscribe to it!
+              if (reply.privateTopic && reply.privateKey) {
+                useChatStore.getState().addPrivateConversation(senderId, reply.privateTopic, reply.privateKey);
+                this.subscribeToPrivateContinuation(reply.privateTopic, reply.privateKey, senderId);
+              }
+            }
+          }
+          return; // Hide ciphertext from others entirely
+        }
+
+        // Moderated raw submission delivery
+        const isRaw = descriptor.name.endsWith(':raw');
+        if (isRaw) {
+          // Add to moderation queue of the output channel
+          const outputName = descriptor.name.replace(':raw', '');
+          const outputTopic = useChatStore.getState().subscribedTopics.find(t => t.name === outputName);
+          if (outputTopic) {
+            const outputStoreId = getTopicId(outputTopic);
+            useChatStore.getState().addToModerationQueue(outputStoreId, {
+              ...envelope,
+              message: processedPayload
+            });
+          }
+          return;
+        }
+
+        // Normal delivery
+        useChatStore.getState().addEnvelope(getTopicId(descriptor), {
+          ...envelope,
+          message: processedPayload
+        });
+      // Presence is ephemeral — replaying up to 48h of stale heartbeats is
+      // pure noise; everything else wants history.
+      }, { since: isPresence ? 'latest' : 'all' });
+
+      this.activeSubscriptions.set(topicId, sub);
+
+      const isSpecial = isTicker || isPresence || descriptor.name.endsWith(':raw') || descriptor.name.startsWith('axona:metric:');
+      
+      if (!isSpecial) {
+        try {
+          const hexId = await this.getTopicHexId(descriptor);
+          const metricsDescriptor = metricTopic(hexId);
+          const metricsSub = await this.peer.sub(metricsDescriptor, (env) => {
+            try {
+              const m = typeof env.message === 'string' ? JSON.parse(env.message) : env.message;
+              if (m) {
+                const storeId = getTopicId(descriptor);
+                useChatStore.getState().updateTopicMetrics(storeId, {
+                  current_count: m.current_count,
+                  subscribers: m.subscribers,
+                  bytes: m.bytes
+                });
+              }
+            } catch (err) {
+              console.error('Failed to parse metrics:', err);
+            }
+          }, { since: 'all' });
+          this.activeSubscriptions.set('metrics-' + topicId, metricsSub);
+        } catch (err) {
+          console.error('Failed to subscribe to metrics for ' + descriptor.name, err);
+        }
+      }
+    } catch (e) {
+      console.error(`Failed to subscribe to ${descriptor.name}:`, e);
+    }
+  }
+
+  async subscribeToPrivateContinuation(topicName, key, partnerId) {
+    if (!this.peer) return;
+
+    const descriptor = { region: 'useast', name: topicName, write: 'open' };
+    const id = await this.getTopicHexId(descriptor);
+
+    if (this.activeSubscriptions.has(id)) return;
+
+    try {
+      const sub = await this.peer.sub(descriptor, (envelope) => {
+        const payload = envelope.message;
+        if (payload && payload.ciphertext) {
+          const decrypted = CryptoService.decryptSymmetric(payload.ciphertext, key);
+          if (decrypted) {
+            useChatStore.getState().addPrivateMessage(partnerId, {
+              id: envelope.msgId,
+              sender: payload.handle || 'Anonymous',
+              text: decrypted,
+              ts: envelope.ts
+            });
+          }
+        }
+      }, { since: 'all' });
+
+      this.activeSubscriptions.set(id, sub);
+    } catch (e) {
+      console.error('Failed private continuation sub:', e);
+    }
+  }
+
+  async publish(descriptor, text, options = {}) {
+    if (!this.peer) throw new Error('Peer not connected.');
+
+    const store = useChatStore.getState();
+    const handle = store.currentHandle;
+    const declaration = store.currentDeclaration;
+
+    if (!handle) throw new Error('No active handle selected.');
+
+    // Load active author identity
+    const activeAuthor = await this.getActiveAuthor();
+
+    let targetDescriptor = descriptor;
+    let payload;
+
+    // Check if this is a symmetrically encrypted channel
+    if (descriptor.privateKey) {
+      const encryptedText = CryptoService.encryptSymmetric(text, descriptor.privateKey);
+      payload = {
+        kind: 'encrypted-channel',
+        handle: handle.name,
+        authorClass: declaration,
+        ciphertext: encryptedText,
+        replyTo: options.replyTo || undefined
+      };
+    } else {
+      payload = makeMessage(text, {
+        handle: handle.name,
+        authorClass: declaration,
+        replyTo: options.replyTo || undefined
+      });
+    }
+
+    // 1. Private Encrypted Reply (§9)
+    if (options.encryptToRecipient) {
+      const encryptedText = CryptoService.encryptToAuthor(
+        JSON.stringify({
+          text,
+          privateTopic: options.privateTopic || undefined,
+          privateKey: options.privateKey || undefined
+        }),
+        options.encryptToRecipient,
+        handle.authorId
+      );
+
+      payload = {
+        kind: 'encrypted-reply',
+        handle: handle.name,
+        authorClass: declaration,
+        ciphertext: encryptedText,
+        replyTo: options.replyTo || undefined
+      };
+    }
+
+    // 2. Moderation Funnel Routing
+    const isOwner = descriptor.owner === handle.authorId;
+    if (descriptor.mode === 'moderated' && !isOwner) {
+      // Route reply to the open raw companion channel instead
+      targetDescriptor = {
+        region: descriptor.region,
+        name: descriptor.name + ':raw',
+        write: 'open'
+      };
+    }
+
+    // Publish on the protocol peer
+    const msgId = await this.peer.pub(targetDescriptor, payload, { signWith: activeAuthor });
+    return msgId;
+  }
+
+  async publishPrivateContinuation(partnerId, text) {
+    if (!this.peer) return;
+
+    const store = useChatStore.getState();
+    const conv = store.privateConversations[partnerId];
+    if (!conv) return;
+
+    const handle = store.currentHandle;
+    const activeAuthor = await this.getActiveAuthor();
+
+    const descriptor = { region: 'useast', name: conv.topic, write: 'open' };
+    const ciphertext = CryptoService.encryptSymmetric(text, conv.key);
+
+    const payload = {
+      handle: handle ? handle.name : 'Anonymous',
+      ciphertext
+    };
+
+    await this.peer.pub(descriptor, payload, { signWith: activeAuthor });
+
+    // Instantly append local copy for fast feedback
+    useChatStore.getState().addPrivateMessage(partnerId, {
+      id: Math.random().toString(),
+      sender: handle ? handle.name : 'You',
+      text,
+      ts: Date.now()
+    });
+  }
+
+  async forwardMessage(outputTopicDescriptor, originalEnvelope) {
+    if (!this.peer) return;
+    const activeAuthor = await this.getActiveAuthor();
+    
+    // Republish approved content under the owner key on the output channel
+    const originalPayload = originalEnvelope.message;
+    const payload = {
+      ...originalPayload,
+      forwardedFrom: originalEnvelope.signerPubkey,
+      forwardedAt: Date.now()
+    };
+
+    await this.peer.pub(outputTopicDescriptor, payload, { signWith: activeAuthor });
+  }
+
+  async deleteOwnMessage(topicDescriptor, msgId) {
+    if (!this.peer) return;
+    const activeAuthor = await this.getActiveAuthor();
+    await this.peer.kill(topicDescriptor, msgId, { signWith: activeAuthor });
+  }
+
+  async advertiseTopic(targetDescriptor, blurb) {
+    if (!this.peer) return;
+    const activeAuthor = await this.getActiveAuthor();
+    const targetId = await this.getTopicHexId(targetDescriptor);
+
+    // Prevent recursive self-ads
+    const tickerId = await this.getTopicHexId(this.tickerTopic);
+    if (targetId === tickerId) {
+      alert("Cannot advertise the ticker topic itself!");
+      return;
+    }
+
+    // The FULL descriptor identity must travel with the ad: {region, owner,
+    // name, write} all fold into the topic id, so an ad without owner/write
+    // would send joiners of an owned channel to a different (empty) topic.
+    const payload = {
+      type: 'topic.ad',
+      name: targetDescriptor.name,
+      blurb,
+      topicId: targetId,
+      network: 'testnet',
+      region: targetDescriptor.region || 'useast',
+      mode: targetDescriptor.mode || 'open',
+      owner: targetDescriptor.owner || null,
+      write: targetDescriptor.write || (targetDescriptor.owner ? 'owner' : 'open'),
+      postedAt: Date.now()
+    };
+
+    await this.peer.pub(this.tickerTopic, payload, { signWith: activeAuthor });
+  }
+
+  startPresenceHeartbeat() {
+    this.stopPresenceHeartbeat();
+    const beat = async () => {
+      if (!this.peer) return;
+      const store = useChatStore.getState();
+      const handle = store.currentHandle;
+      const decl = store.currentDeclaration;
+      if (!handle) return;
+
+      try {
+        const activeAuthor = await this.getActiveAuthor();
+        const payload = {
+          type: 'heartbeat',
+          handle: handle.name,
+          declaration: decl
+        };
+        await this.peer.pub(this.heartbeatTopic, payload, { signWith: activeAuthor });
+      } catch {
+        // Suppress heartbeat publish errors
+      }
+    };
+
+    beat();
+    this.presenceInterval = setInterval(beat, 30000);
+  }
+
+  stopPresenceHeartbeat() {
+    if (this.presenceInterval) {
+      clearInterval(this.presenceInterval);
+      this.presenceInterval = null;
+    }
+  }
+}
+
+export default new AxonaChatClient();
