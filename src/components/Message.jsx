@@ -1,5 +1,6 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useChatStore } from '../stores/useChatStore.js';
 import AxonaChatClient from '../services/AxonaChatClient.js';
 import LinkPreview from './LinkPreview.jsx';
@@ -212,11 +213,21 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
           }}
         >
           <ReactMarkdown
+            // GFM: tables, strikethrough, task lists, autolinks — a pasted
+            // markdown document must render whole, not a subset (§7.2).
+            remarkPlugins={[remarkGfm]}
             components={{
               a: ({ href, children }) => (
                 <a href={href} target="_blank" rel="noopener noreferrer">
                   {children}
                 </a>
+              ),
+              // Wide tables scroll inside their own container instead of
+              // stretching the message pane.
+              table: ({ children }) => (
+                <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+                  <table>{children}</table>
+                </div>
               )
             }}
           >

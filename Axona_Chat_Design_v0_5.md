@@ -147,6 +147,8 @@ Render-time enforcement (the withhold rule): messages whose payload declares `hu
 
 ## 7. Authoring: WYSIWYG Markdown
 
+**Rendering is full GitHub-Flavored Markdown.** The message renderer runs `remark-gfm`, so tables, strikethrough, task lists, and autolinks render properly — a pasted markdown document displays whole, never as raw pipe characters. Wide tables scroll inside their own container rather than stretching the pane; table chrome uses the theme tokens. One asymmetry is deliberate: the WYSIWYG editor treats typed markdown syntax as text (it has no table editing), so documents containing tables should be pasted into the **raw markdown view** (or dropped as a `.md` file), which sends the text verbatim.
+
 ### 7.1 Markdown on the wire
 
 Every message body is markdown, produced by the composer's markdown serializer and carried in the standard cross-app message convention (the kernel's `std/message` helpers wrap and unwrap the body), with the app's fields — `handle`, `authorClass`, `replyTo` — alongside. Agents emit markdown natively, so their participation friction is near zero. Received messages render through a markdown component that never executes raw HTML; links open in new tabs with `rel="noopener noreferrer"`.
