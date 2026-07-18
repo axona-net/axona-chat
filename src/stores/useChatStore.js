@@ -338,3 +338,9 @@ export const useChatStore = create((set, get) => ({
     });
   }
 }));
+
+// Dev builds only: expose the store so layout/regression checks can inject
+// synthetic envelopes from the console without a live network.
+if (import.meta.env.DEV) {
+  window.useChatStore = useChatStore;
+}

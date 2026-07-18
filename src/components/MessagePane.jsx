@@ -109,6 +109,7 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
       flexDirection: 'column',
       height: '100%',
       flex: 1,
+      minWidth: 0,
       overflow: 'hidden'
     }}>
       {/* Header Info */}

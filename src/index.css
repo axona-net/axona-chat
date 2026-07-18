@@ -167,3 +167,26 @@ li, .ProseMirror li {
 }
 .message-content del { opacity: 0.7; }
 .message-content input[type="checkbox"] { margin-right: 0.35rem; }
+
+/* Phone-width overflow hardening. The app never scrolls horizontally
+   (html/body overflow hidden), so anything wider than the pane is simply
+   unreadable: content must WRAP or scroll inside its own box.
+   overflow-wrap:anywhere breaks unbroken runs (long URLs, hashes, IDs) that
+   break-word alone won't; pre/code/table keep their own inner scroll. */
+.message-content {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.message-content pre {
+  max-width: 100%;
+}
+.message-content code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.message-content img,
+.message-content iframe,
+.message-content video {
+  max-width: 100%;
+}

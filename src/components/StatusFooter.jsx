@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { KERNEL_VERSION } from '@axona/protocol';
 import { useChatStore } from '../stores/useChatStore.js';
 import { useHandle } from '../contexts/HandleContext.jsx';
@@ -15,6 +15,16 @@ const StatusFooter = ({ onOpenModal }) => {
   const { theme, toggleTheme, presence } = useChatStore();
   const [showHandlesList, setShowHandlesList] = useState(false);
   const [showParticipantsList, setShowParticipantsList] = useState(false);
+
+  // Phone-width footer: drop the informational text (bridge host, version
+  // string, member breakdown words) so the interactive controls fit on one
+  // row. Same 800px threshold as ChatShell's tab layout.
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 800);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 800);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const toggleDeclaration = () => {
     setDeclaration(declaration === 'human' ? 'agent' : 'human');
@@ -44,7 +54,7 @@ const StatusFooter = ({ onOpenModal }) => {
       color: 'var(--color-text)'
     }}>
       {/* Left side: Mesh status, active persona dropdown, declaration, theme toggle, QR code */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.4rem' : '0.8rem', position: 'relative', minWidth: 0 }}>
         {/* Connection Dot */}
         <div
           title="Your connection to the Axona network — green means you're online and messages flow"
@@ -57,21 +67,27 @@ const StatusFooter = ({ onOpenModal }) => {
             background: status.ready ? '#2ecc71' : '#f1c40f',
             display: 'inline-block'
           }} />
-          <span style={{ color: 'var(--color-text)', fontWeight: '500' }}>
-            {status.reason === 'connecting' ? 'Connecting...' : status.ready ? 'Online' : 'Seeking Peers'}
-          </span>
-          <span style={{ color: 'var(--color-muted)', fontSize: '0.7rem' }}>
-            ({bridgeUrl.replace('wss://', '').replace('https://', '')})
-          </span>
-          <span
-            title="Application version · Axona protocol kernel version"
-            style={{ color: 'var(--color-muted)', fontSize: '0.68rem', fontFamily: 'monospace' }}
-          >
-            v{APP_VERSION} · kernel {KERNEL_VERSION}
-          </span>
+          {!isMobile && (
+            <span style={{ color: 'var(--color-text)', fontWeight: '500' }}>
+              {status.reason === 'connecting' ? 'Connecting...' : status.ready ? 'Online' : 'Seeking Peers'}
+            </span>
+          )}
+          {!isMobile && (
+            <span style={{ color: 'var(--color-muted)', fontSize: '0.7rem' }}>
+              ({bridgeUrl.replace('wss://', '').replace('https://', '')})
+            </span>
+          )}
+          {!isMobile && (
+            <span
+              title="Application version · Axona protocol kernel version"
+              style={{ color: 'var(--color-muted)', fontSize: '0.68rem', fontFamily: 'monospace' }}
+            >
+              v{APP_VERSION} · kernel {KERNEL_VERSION}
+            </span>
+          )}
         </div>
 
-        <span style={{ color: 'var(--border-color)', opacity: 0.5 }}>|</span>
+        {!isMobile && <span style={{ color: 'var(--border-color)', opacity: 0.5 }}>|</span>}
 
         {/* Persona Dropdown Trigger */}
         <div style={{ position: 'relative' }}>
@@ -86,7 +102,11 @@ const StatusFooter = ({ onOpenModal }) => {
               border: '1px solid var(--border-color)',
               borderRadius: '4px',
               cursor: 'pointer',
-              color: 'var(--color-text)'
+              color: 'var(--color-text)',
+              maxWidth: isMobile ? '110px' : 'none',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
             }}
           >
             👤 {activeHandle ? activeHandle.name : 'Persona'} <span style={{ fontSize: '0.6rem' }}>▼</span>
@@ -196,7 +216,7 @@ const StatusFooter = ({ onOpenModal }) => {
           }}
           title="Start a private conversation: shows a QR code and link that open an encrypted one-to-one channel with whoever uses it"
         >
-          🔗 QR Link
+          🔗{!isMobile && ' QR Link'}
         </button>
       </div>
 
@@ -212,7 +232,9 @@ const StatusFooter = ({ onOpenModal }) => {
             userSelect: 'none'
           }}
         >
-          👥 Members: {humans.length} Humans | {agents.length} Agents
+          {isMobile
+            ? `👥 ${humans.length}·${agents.length}`
+            : `👥 Members: ${humans.length} Humans | ${agents.length} Agents`}
         </span>
 
         {showParticipantsList && (

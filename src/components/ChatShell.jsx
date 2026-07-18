@@ -148,11 +148,15 @@ const ChatShell = () => {
           <ChannelList onOpenModal={handleOpenModal} />
         </div>
 
-        {/* Center Column: MessagePane & Composer & StatusFooter */}
+        {/* Center Column: MessagePane & Composer & StatusFooter.
+            minWidth 0: without it this flex child refuses to shrink below its
+            content's min-width, so one long unbroken string widens the whole
+            pane past a phone viewport (which cannot scroll — overflow hidden). */}
         <div style={{
           display: isMobile ? (mobileTab === 'chat' ? 'flex' : 'none') : 'flex',
           flexDirection: 'column',
           flex: 1,
+          minWidth: 0,
           height: '100%',
           background: 'var(--color-column-bg)'
         }}>
