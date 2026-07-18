@@ -190,3 +190,9 @@ li, .ProseMirror li {
 .message-content video {
   max-width: 100%;
 }
+/* Tables already scroll inside their own wrapper — mid-word breaking there
+   only mangles cell text ("col-thre e"), so restore normal wrapping. */
+.message-content table {
+  overflow-wrap: normal;
+  word-break: normal;
+}

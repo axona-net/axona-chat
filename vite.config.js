@@ -21,7 +21,10 @@ export default defineConfig(() => ({
     // instantly ("ICE failed, your TURN server appears to be broken") and the
     // mesh never forms. Chromium is unaffected, which is why this only bit
     // Firefox users. Served from 127.0.0.1 the same code works everywhere.
-    host: '127.0.0.1'
+    host: '127.0.0.1',
+    // Honor an assigned port (launch harness autoPort) so parallel sessions
+    // don't fight over one hardcoded port; vite's default otherwise.
+    ...(process.env.PORT ? { port: Number(process.env.PORT), strictPort: true } : {})
   },
   resolve: {
     alias: {

@@ -2,7 +2,7 @@
 
 **Version 0.5 · Targets kernel 4.27.1 / wire 4.0 · David A. Smith**
 
-*v0.5 (2026-07-18) consolidates the app's v0.11–v0.15 feature work: no-space topic names + deep links (§5.3), advertisement retraction (§13), unread badges with persisted last-read watermarks (§12.2), spaced-name ad sunset (§13), and the shareable link-preview card (§17).*
+*v0.5 (2026-07-18) consolidates the app's v0.11–v0.15 feature work: no-space topic names + deep links (§5.3), advertisement retraction (§13), unread badges with persisted last-read watermarks (§12.2), spaced-name ad sunset (§13), and the shareable link-preview card (§17). Updated 2026-07-18 (app v0.20.0–0.20.1): width discipline made normative (§7.6) after a field report of unreadable wide messages on phones; acceptance test 23 extended to match.*
 
 A decentralized topic-based chat application built on the Axona protocol, in which humans and AI agents participate as first-class peers on equal terms. No servers, no accounts, no central operator.
 
@@ -175,6 +175,15 @@ A rendered message taller than a fixed panel height (comfortably smaller than th
 ### 7.5 System fonts, no virtualization
 
 UI text renders in the platform's system font stack — zero network cost. The message list keeps every message in the DOM; the bounded replay cache is the ceiling, and virtualization is deliberately rejected — it exists to solve unbounded lists, and the replay cache means no topic's list is unbounded; rendering the full window is simpler, keeps find-in-page and screen readers working, and is well within budget.
+
+### 7.6 Width discipline — nothing widens the pane
+
+The app shell never scrolls horizontally (page-level overflow is hidden), so any content wider than the message pane is simply unreadable — there is no scrollbar to rescue it. Content therefore either **wraps** or **scrolls inside its own box**, never widens the pane. Normatively:
+
+- Every flex container on the path from the app shell to the message list carries `min-width: 0` — without it a flex child refuses to shrink below its content's min-width, and one long unbroken string (a hash, a URL, a key) silently widens the whole pane past a phone viewport. This is the failure mode that reads as "text too wide, no way to scroll" on a phone.
+- Message text (including inline code) breaks unbroken runs with `overflow-wrap: anywhere` — `break-word` alone will not split a token with no break opportunities.
+- Code blocks and GFM tables keep their content un-mangled and scroll horizontally inside their own bounded boxes; tables explicitly opt back out of `anywhere` breaking (mid-word breaks in cells mangle header text).
+- Images, iframes (YouTube), video, and link-preview cards are capped at `max-width: 100%`.
 
 ---
 
@@ -406,7 +415,7 @@ A build is correct when all of the following pass. They are ordered so that the 
 20. **Ad retraction:** A advertises a topic; the ✕ appears on that ad in A's browse panel but NOT in B's; A retracts through the two-step confirm; the ad disappears from DISCOVER on A *and* on B without either reloading.
 21. **Unread badges:** B posts to a topic A is subscribed to but not viewing — a badge with the count appears on that topic in A's rail and increments on further posts; A switches to the topic — the badge clears; A reloads — it stays cleared (watermark persisted); messages A posted never count.
 22. **One ad per topic:** with an ad for the active topic live on the ticker, the Advertise button reads "Advertised" and is disabled (grayed, explanatory tooltip); retracting that ad re-enables it. Comparison is by kernel-derived hex topic id, not descriptor spelling.
-23. **Phone width (375px):** a message containing an unbroken 128-char hash, a long URL, a wide code block, and a wide table is fully readable — text wraps, pre/table scroll inside their own boxes, and the page never scrolls horizontally; the status footer fits on one row (informational text hidden, controls intact); the expanded composer fits and sends.
+23. **Phone width (375px):** a message containing an unbroken 128-char hash, a long URL, a long unbroken inline-code token, a wide code block, a wide table, a YouTube embed, and a link-preview card is fully readable — text and inline code wrap, pre/table scroll inside their own boxes with cell text un-mangled, embeds and cards fit the pane, the long-message pager (§7.4) fits with its controls, and the page never scrolls horizontally (`document.scrollWidth` equals the viewport width throughout); the status footer fits on one row (informational text hidden, controls intact); the expanded composer fits and sends.
 
 ---
 
@@ -420,4 +429,4 @@ A build is correct when all of the following pass. They are ordered so that the 
 
 ---
 
-*— end of chat design v0.4, targeting kernel 4.27.1 —*
+*— end of chat design v0.5, targeting kernel 4.27.1 —*
