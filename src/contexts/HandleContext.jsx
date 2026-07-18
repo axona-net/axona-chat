@@ -10,6 +10,13 @@ export const HandleProvider = ({ children }) => {
   const [activeHandleId, setActiveHandleId] = useState(null);
   const [declaration, setDeclaration] = useState('human'); // 'human' | 'agent' | 'unstated'
 
+  // Persistence is gated on this flag: the persist effects below fire on
+  // mount with default state, and under StrictMode a skip-first-run ref is
+  // defeated by the double-invoked effects — either way the defaults would
+  // clobber storage before the async load resolves. Nothing persists until
+  // the load has finished.
+  const loadedRef = React.useRef(false);
+
   // Load persisted handles & active handle ID & declaration on mount
   useEffect(() => {
     const load = async () => {
@@ -43,15 +50,15 @@ export const HandleProvider = ({ children }) => {
           console.warn('localStorage fallback load failed:', errLocal);
         }
       }
+      loadedRef.current = true;
     };
     load();
   }, []);
 
   // Persist handles whenever they change. Persist the EMPTY list too —
   // otherwise deleting the last persona resurrects it on reload.
-  const handlesLoaded = React.useRef(false);
   useEffect(() => {
-    if (!handlesLoaded.current) { handlesLoaded.current = true; return; }
+    if (!loadedRef.current) return;
     try {
       set('axona-handles', handles);
       localStorage.setItem('axona-handles', JSON.stringify(handles));
@@ -72,8 +79,10 @@ export const HandleProvider = ({ children }) => {
     }
   }, [activeHandleId]);
 
-  // Persist declaration
+  // Persist declaration (gated on load — see loadedRef above; this was
+  // the bug that reverted Agent → Human on every reload).
   useEffect(() => {
+    if (!loadedRef.current) return;
     try {
       set('axona-global-declaration', declaration);
       localStorage.setItem('axona-global-declaration', declaration);

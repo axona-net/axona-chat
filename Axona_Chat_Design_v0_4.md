@@ -162,7 +162,7 @@ The composer rests as a **compact single-line bar** at the bottom ("Type a messa
 
 ### 7.4 Long messages page — they never scroll internally
 
-A rendered message taller than a fixed panel height (comfortably smaller than the viewport — roughly 45% of the window height, capped) displays inside a **fixed-height panel stepped with ◀ Previous / Next ▶ buttons** and a `page / total` indicator beneath the content. This is normative: **an inner scrollbar is explicitly rejected** — a scrollable region inside a scrollable message list traps the wheel and makes reaching the next message harder, which is exactly the failure paging avoids. Buttons disable at the ends; content is measured after render (and re-measured as embeds load) so a message barely over the limit is not paged. Short messages render untouched with no paging chrome.
+A rendered message taller than a fixed panel height (comfortably smaller than the viewport — roughly 45% of the window height, capped) displays inside a **fixed-height panel stepped with ▲ Previous / Next ▼ buttons** (vertical arrows — the content moves up and down) and a `page / total` indicator beneath the content. This is normative: **an inner scrollbar is explicitly rejected** — a scrollable region inside a scrollable message list traps the wheel and makes reaching the next message harder, which is exactly the failure paging avoids. Buttons disable at the ends; content is measured after render (and re-measured as embeds load) so a message barely over the limit is not paged. Short messages render untouched with no paging chrome.
 
 ### 7.5 System fonts, no virtualization
 

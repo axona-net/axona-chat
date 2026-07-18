@@ -230,7 +230,7 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
               color: page === 0 ? 'var(--color-muted)' : 'var(--color-primary)', fontWeight: '600'
             }}
           >
-            ◀ Previous
+            ▲ Previous
           </button>
           <span style={{ color: 'var(--color-muted)' }}>{page + 1} / {pageCount}</span>
           <button
@@ -242,7 +242,7 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
               color: page >= pageCount - 1 ? 'var(--color-muted)' : 'var(--color-primary)', fontWeight: '600'
             }}
           >
-            Next ▶
+            Next ▼
           </button>
         </div>
       )}
