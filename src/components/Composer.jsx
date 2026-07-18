@@ -70,6 +70,33 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
     setRawMarkdown(e.target.value);
   };
 
+  // Drag & drop of text / markdown files: read each file and append its
+  // content to the draft. Works on the compact bar too (dropping expands
+  // the composer). Non-text files are ignored.
+  const handleFileDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = [...(e.dataTransfer?.files || [])].filter(f =>
+      /\.(md|markdown|txt)$/i.test(f.name) || (f.type && f.type.startsWith('text/')));
+    if (files.length === 0) return;
+    let dropped = '';
+    for (const f of files) {
+      try { dropped += (dropped ? '\n\n' : '') + await f.text(); }
+      catch { /* unreadable file — skip */ }
+    }
+    if (!dropped.trim()) return;
+    const current = isRawView ? rawMarkdown : (editor?.getMarkdown() || '');
+    const next = current.trim() ? current + '\n\n' + dropped : dropped;
+    if (next.length > 15000) {
+      alert('Dropped content would exceed the 15 KB message limit.');
+      return;
+    }
+    setRawMarkdown(next);
+    editor?.commands.setContent(next, { contentType: 'markdown' });
+    setIsExpanded(true);
+  };
+  const handleDragOver = (e) => { e.preventDefault(); };
+
   const handleToggleRaw = (checked) => {
     if (checked) {
       setRawMarkdown(editor?.getMarkdown() || '');
@@ -233,8 +260,10 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
           </div>
         )}
 
-        <div 
+        <div
           onClick={() => setIsExpanded(true)}
+          onDragOver={handleDragOver}
+          onDrop={handleFileDrop}
           style={{
             padding: '0.55rem 0.8rem',
             background: 'var(--color-surface)',
@@ -410,8 +439,12 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
               </label>
             </div>
 
-            {/* Editor Content Area */}
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+            {/* Editor Content Area — accepts dropped .md / .txt files */}
+            <div
+              onDragOver={handleDragOver}
+              onDrop={handleFileDrop}
+              style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
+            >
               {isRawView ? (
                 <textarea
                   value={rawMarkdown}

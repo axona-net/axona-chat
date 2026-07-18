@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
+import { KERNEL_VERSION } from '@axona/protocol';
 import { useChatStore } from '../stores/useChatStore.js';
 import { useHandle } from '../contexts/HandleContext.jsx';
 import { usePeer } from '../contexts/PeerContext.jsx';
 import { useNetwork } from '../contexts/NetworkContext.jsx';
+
+// Injected by Vite from package.json at build time.
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
 
 const StatusFooter = ({ onOpenModal }) => {
   const { handles, activeHandle, setActiveHandleId, declaration, setDeclaration } = useHandle();
@@ -55,6 +59,12 @@ const StatusFooter = ({ onOpenModal }) => {
           </span>
           <span style={{ color: 'var(--color-muted)', fontSize: '0.7rem' }}>
             ({bridgeUrl.replace('wss://', '').replace('https://', '')})
+          </span>
+          <span
+            title="Application version · Axona protocol kernel version"
+            style={{ color: 'var(--color-muted)', fontSize: '0.68rem', fontFamily: 'monospace' }}
+          >
+            v{APP_VERSION} · kernel {KERNEL_VERSION}
           </span>
         </div>
 

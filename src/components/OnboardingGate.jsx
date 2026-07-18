@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { useHandle } from '../contexts/HandleContext.jsx';
 
+// Marks first-run setup complete and lets the peer layer know it may
+// connect (first-run connection waits so it can use the granted location).
+const completeOnboarding = () => {
+  try { localStorage.setItem('axona-onboarded', '1'); } catch { /* ignore */ }
+  window.dispatchEvent(new Event('axona-onboarded'));
+};
+
 const OnboardingGate = ({ children }) => {
   const { handles, declaration, setDeclaration, createHandle, importHandle } = useHandle();
   const [handleName, setHandleName] = useState('');
@@ -8,11 +15,40 @@ const OnboardingGate = ({ children }) => {
   const [mode, setMode] = useState('create'); // 'create' | 'import'
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // First-run requirements: an explicit operator declaration (no default)
+  // and a location decision (granted or explicitly skipped).
+  const [decl, setDecl] = useState(null);            // 'human' | 'agent' | null
+  const [locState, setLocState] = useState('ask');   // 'ask' | 'requesting' | 'granted' | 'skipped'
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) { setLocState('skipped'); return; }
+    setLocState('requesting');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        // Round to ~1 decimal (≈11 km): enough to seed the node's regional
+        // placement, coarse enough to not be a precise location record.
+        const lat = Math.round(pos.coords.latitude * 10) / 10;
+        const lng = Math.round(pos.coords.longitude * 10) / 10;
+        try { localStorage.setItem('axona-node-location', JSON.stringify({ lat, lng })); } catch { /* ignore */ }
+        setLocState('granted');
+      },
+      () => setLocState('skipped'),
+      { timeout: 10_000, maximumAge: 3_600_000 }
+    );
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!handleName.trim()) {
       setError('Please enter a handle name.');
+      return;
+    }
+    if (!decl) {
+      setError('Please declare whether this app is operated by a human or an agent.');
+      return;
+    }
+    if (locState === 'ask' || locState === 'requesting') {
+      setError('Please allow your location, or choose to use the default region.');
       return;
     }
     setError('');
@@ -24,6 +60,8 @@ const OnboardingGate = ({ children }) => {
       } else {
         await importHandle(handleName.trim(), keyEnvelope.trim());
       }
+      setDeclaration(decl);
+      completeOnboarding();
     } catch (err) {
       setError(err.message || 'Action failed. Please check the input.');
     } finally {
@@ -114,10 +152,83 @@ const OnboardingGate = ({ children }) => {
               </div>
             )}
 
+            {/* Operator declaration — an explicit choice, no default */}
+            <div>
+              <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.25rem' }}>
+                Who operates this app?
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setDecl('human')}
+                  style={{
+                    flex: 1, padding: '0.6rem', fontWeight: '600', cursor: 'pointer',
+                    borderRadius: 'var(--radius)',
+                    border: decl === 'human' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                    background: decl === 'human' ? 'var(--color-primary)' : 'transparent',
+                    color: decl === 'human' ? '#fff' : 'var(--color-text)'
+                  }}
+                >
+                  🙋 I am Human
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDecl('agent')}
+                  style={{
+                    flex: 1, padding: '0.6rem', fontWeight: '600', cursor: 'pointer',
+                    borderRadius: 'var(--radius)',
+                    border: decl === 'agent' ? '2px solid var(--color-primary)' : '1px solid var(--border-color)',
+                    background: decl === 'agent' ? 'var(--color-primary)' : 'transparent',
+                    color: decl === 'agent' ? '#fff' : 'var(--color-text)'
+                  }}
+                >
+                  🤖 I am Agent
+                </button>
+              </div>
+            </div>
+
+            {/* Location — improves the node's network placement; coarse only */}
+            <div>
+              <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.25rem' }}>
+                Location (places your node in a nearby network region — stored coarsely, ~11 km)
+              </label>
+              {locState === 'granted' ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-success, #2ecc71)', fontWeight: '600' }}>✓ Location set</div>
+              ) : locState === 'skipped' ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Using default region (US East)</div>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={requestLocation}
+                    disabled={locState === 'requesting'}
+                    style={{
+                      flex: 1, padding: '0.55rem', cursor: 'pointer', fontWeight: '600',
+                      borderRadius: 'var(--radius)', border: '1px solid var(--border-color)',
+                      background: 'transparent', color: 'var(--color-text)'
+                    }}
+                  >
+                    {locState === 'requesting' ? 'Requesting…' : '📍 Allow my location'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLocState('skipped')}
+                    style={{
+                      flex: 1, padding: '0.55rem', cursor: 'pointer',
+                      borderRadius: 'var(--radius)', border: '1px solid var(--border-color)',
+                      background: 'transparent', color: 'var(--color-muted)'
+                    }}
+                  >
+                    Use default region
+                  </button>
+                </div>
+              )}
+            </div>
+
             {error && <div style={{ color: '#ff6b6b', fontSize: '0.85rem' }}>{error}</div>}
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isLoading}
               style={{
                 background: 'var(--color-primary-light)',

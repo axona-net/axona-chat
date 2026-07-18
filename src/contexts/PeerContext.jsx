@@ -17,10 +17,35 @@ export const PeerProvider = ({ children }) => {
     let cleanup = null;
     let interval = null;
 
+    // First run only: wait for onboarding to finish so the connection can
+    // use the location the user just granted (or explicitly skipped).
+    // Returning users (onboarded flag, or pre-feature installs that already
+    // have handles) connect immediately.
+    const isOnboarded = () => {
+      try {
+        return !!(localStorage.getItem('axona-onboarded') || localStorage.getItem('axona-handles'));
+      } catch { return true; }
+    };
+    const waitForOnboarding = () => new Promise((resolve) => {
+      if (isOnboarded()) return resolve();
+      const done = () => { window.removeEventListener('axona-onboarded', done); resolve(); };
+      window.addEventListener('axona-onboarded', done);
+    });
+
+    const storedLocation = () => {
+      try {
+        const raw = localStorage.getItem('axona-node-location');
+        const loc = raw ? JSON.parse(raw) : null;
+        if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) return loc;
+      } catch { /* fall through */ }
+      return { lat: 38.0, lng: -77.0 };   // default region (US East)
+    };
+
     const init = async () => {
       setStatus({ ready: false, peers: 0, ms: 0, reason: 'connecting' });
       try {
-        const location = { lat: 38.0, lng: -77.0 };
+        await waitForOnboarding();
+        const location = storedLocation();
 
         if (!active) return;
 

@@ -47,15 +47,16 @@ export const HandleProvider = ({ children }) => {
     load();
   }, []);
 
-  // Persist handles whenever they change
+  // Persist handles whenever they change. Persist the EMPTY list too —
+  // otherwise deleting the last persona resurrects it on reload.
+  const handlesLoaded = React.useRef(false);
   useEffect(() => {
-    if (handles.length > 0) {
-      try {
-        set('axona-handles', handles);
-        localStorage.setItem('axona-handles', JSON.stringify(handles));
-      } catch (err) {
-        console.warn('Handles persistence failed:', err);
-      }
+    if (!handlesLoaded.current) { handlesLoaded.current = true; return; }
+    try {
+      set('axona-handles', handles);
+      localStorage.setItem('axona-handles', JSON.stringify(handles));
+    } catch (err) {
+      console.warn('Handles persistence failed:', err);
     }
   }, [handles]);
 

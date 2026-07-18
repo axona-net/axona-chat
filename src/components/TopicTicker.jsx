@@ -5,6 +5,7 @@ import AxonaChatClient from '../services/AxonaChatClient.js';
 const TopicTicker = () => {
   const { advertisedTopics, tickerVisible, setTickerVisible, addTopic, setActiveTopic } = useChatStore();
   const [isPaused, setIsPaused] = useState(false);
+  const [showBrowse, setShowBrowse] = useState(false);
 
   const handleToggle = () => {
     const next = !tickerVisible;
@@ -61,16 +62,85 @@ const TopicTicker = () => {
       fontSize: '0.8rem',
       gap: '1rem'
     }}>
-      <span style={{
-        fontWeight: 'bold',
-        color: 'var(--color-primary)',
-        whiteSpace: 'nowrap',
-        zIndex: 2,
-        background: 'var(--color-surface)',
-        paddingRight: '0.5rem'
-      }}>
-        DISCOVER:
-      </span>
+      {/* DISCOVER is a button: opens a scrollable browse panel of all
+          currently advertised topics (the ticker shows the same ads in
+          motion; the panel lets you read and pick at leisure). */}
+      <button
+        onClick={() => setShowBrowse(!showBrowse)}
+        title="Browse all advertised topics"
+        style={{
+          fontWeight: 'bold',
+          color: 'var(--color-primary)',
+          whiteSpace: 'nowrap',
+          zIndex: 2,
+          background: 'var(--color-surface)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '4px',
+          padding: '0.1rem 0.5rem',
+          cursor: 'pointer',
+          fontSize: '0.78rem'
+        }}
+      >
+        DISCOVER {showBrowse ? '▲' : '▼'}
+      </button>
+
+      {showBrowse && (
+        <div className="glass" style={{
+          position: 'absolute',
+          top: '100%',
+          left: '0.5rem',
+          zIndex: 40,
+          marginTop: '4px',
+          width: 'min(420px, calc(100vw - 1rem))',
+          maxHeight: '320px',
+          overflowY: 'auto',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+          padding: '0.4rem'
+        }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: 'var(--color-muted)', padding: '0.2rem 0.4rem', textTransform: 'uppercase' }}>
+            Advertised topics ({advertisedTopics.length})
+          </div>
+          {advertisedTopics.length === 0 ? (
+            <div style={{ padding: '0.6rem 0.4rem', color: 'var(--color-muted)', fontSize: '0.8rem' }}>
+              No topics advertised yet. Create a topic and advertise it!
+            </div>
+          ) : (
+            [...advertisedTopics]
+              .sort((a, b) => (b.postedAt || 0) - (a.postedAt || 0))
+              .map((ad, idx) => (
+                <div
+                  key={`browse-${ad.topicId}-${idx}`}
+                  onClick={() => { handleOpenAd(ad); setShowBrowse(false); }}
+                  style={{
+                    padding: '0.45rem 0.4rem',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid var(--border-color)'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: 'bold', color: 'var(--color-text)', fontSize: '0.82rem' }}>#{ad.name}</span>
+                    <span style={{
+                      fontSize: '0.62rem',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      background: ad.mode === 'moderated' ? '#e67e22' : 'rgba(127,127,127,0.25)',
+                      color: ad.mode === 'moderated' ? '#fff' : 'var(--color-text)'
+                    }}>
+                      {ad.mode}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--color-muted)', marginTop: '2px' }}>{ad.blurb}</div>
+                </div>
+              ))
+          )}
+        </div>
+      )}
 
       <div 
         style={{

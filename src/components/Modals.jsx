@@ -17,7 +17,8 @@ const Modals = ({ activeModal, onClose }) => {
     removeFromModerationQueue
   } = useChatStore();
 
-  const { createHandle, importHandle } = useHandle();
+  const { createHandle, importHandle, handles, activeHandle, deleteHandle } = useHandle();
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   // Create channel inputs
   const [chanName, setChanName] = useState('');
@@ -299,6 +300,57 @@ const Modals = ({ activeModal, onClose }) => {
         {activeModal === 'handles' && (
           <div>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', marginBottom: '1rem' }}>Manage Personas</h3>
+
+            {/* Existing personas, with permanent delete */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--color-muted)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+                Your personas
+              </div>
+              {handles.map(h => (
+                <div key={h.id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '0.45rem 0.5rem', borderRadius: '4px',
+                  border: '1px solid var(--border-color)', marginBottom: '0.35rem'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>
+                      {h.name}{activeHandle?.id === h.id && <span style={{ color: 'var(--color-primary)', fontSize: '0.65rem', marginLeft: '0.4rem' }}>ACTIVE</span>}
+                    </div>
+                    <div style={{ fontSize: '0.62rem', color: 'var(--color-muted)', fontFamily: 'monospace' }}>{h.authorId.slice(0, 16)}…</div>
+                  </div>
+                  {confirmDeleteId === h.id ? (
+                    <span style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--color-muted)' }}>Delete key forever?</span>
+                      <button
+                        onClick={async () => { await deleteHandle(h.id); setConfirmDeleteId(null); }}
+                        style={{ background: '#e74c3c', color: '#fff', border: 'none', borderRadius: '3px', padding: '2px 8px', fontSize: '0.7rem', cursor: 'pointer', fontWeight: '600' }}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        style={{ background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--border-color)', borderRadius: '3px', padding: '1px 8px', fontSize: '0.7rem', cursor: 'pointer' }}
+                      >
+                        Keep
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteId(h.id)}
+                      title="Permanently delete this persona and its signing key"
+                      style={{ background: 'transparent', color: '#e74c3c', border: '1px solid #e74c3c', borderRadius: '3px', padding: '2px 8px', fontSize: '0.7rem', cursor: 'pointer' }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              ))}
+              <div style={{ fontSize: '0.68rem', color: 'var(--color-muted)', marginTop: '0.3rem' }}>
+                Deleting a persona destroys its signing key permanently. Messages it already
+                published remain on the network, and you lose the ability to retract them.
+              </div>
+            </div>
+
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
               <button 
                 onClick={() => { setHandleMode('create'); setError(''); }} 

@@ -11,17 +11,40 @@ const getTopicId = (descriptor) => {
   return `${region}:${owner}:${name}:${write}`;
 };
 
+// Subscribed topics persist locally so a returning user's full list is
+// resurrected on rejoin. Descriptors are plain JSON (including any private
+// channel's local key — consistent with handles' keys living in local
+// storage). Falls back to the three default rooms on first run.
+const DEFAULT_TOPICS = [
+  { region: 'useast', name: 'lobby', description: 'Public lobby for everyone' },
+  { region: 'useast', name: 'tech', description: 'Tech discussions' },
+  { region: 'useast', name: 'general', description: 'General chat' }
+];
+
+const loadPersistedTopics = () => {
+  try {
+    const raw = localStorage.getItem('axona-topics');
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(t => t && t.name)) {
+      return parsed;
+    }
+  } catch { /* corrupted or unavailable storage → defaults */ }
+  return DEFAULT_TOPICS;
+};
+
+const persistTopics = (topics) => {
+  try {
+    localStorage.setItem('axona-topics', JSON.stringify(topics));
+  } catch { /* private mode — in-memory only */ }
+};
+
 export const useChatStore = create((set, get) => ({
   // Active states
   activeTopic: { region: 'useast', name: 'lobby' }, // Default open channel
-  activeTopicId: 'useast::lobby:', 
+  activeTopicId: 'useast::lobby:',
 
   // Channels/Topics list
-  subscribedTopics: [
-    { region: 'useast', name: 'lobby', description: 'Public lobby for everyone' },
-    { region: 'useast', name: 'tech', description: 'Tech discussions' },
-    { region: 'useast', name: 'general', description: 'General chat' }
-  ],
+  subscribedTopics: loadPersistedTopics(),
 
   // Ticker (advertised topics)
   tickerVisible: true,
@@ -76,12 +99,17 @@ export const useChatStore = create((set, get) => ({
     set({ activeTopic: topic, activeTopicId: id });
   },
 
-  setSubscribedTopics: (topics) => set({ subscribedTopics: topics }),
+  setSubscribedTopics: (topics) => {
+    persistTopics(topics);
+    set({ subscribedTopics: topics });
+  },
 
   addTopic: (topic) => {
     const exists = get().subscribedTopics.some(t => getTopicId(t) === getTopicId(topic));
     if (!exists) {
-      set(state => ({ subscribedTopics: [...state.subscribedTopics, topic] }));
+      const next = [...get().subscribedTopics, topic];
+      persistTopics(next);
+      set({ subscribedTopics: next });
     }
   },
 
@@ -95,13 +123,16 @@ export const useChatStore = create((set, get) => ({
       }
       return t;
     });
+    persistTopics(updated);
     return { subscribedTopics: updated };
   }),
 
   removeTopic: (topic) => {
-    set(state => ({
-      subscribedTopics: state.subscribedTopics.filter(t => getTopicId(t) !== getTopicId(topic))
-    }));
+    set(state => {
+      const next = state.subscribedTopics.filter(t => getTopicId(t) !== getTopicId(topic));
+      persistTopics(next);
+      return { subscribedTopics: next };
+    });
   },
 
   setTickerVisible: (visible) => set({ tickerVisible: visible }),
