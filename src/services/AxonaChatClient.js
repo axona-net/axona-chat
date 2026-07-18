@@ -433,7 +433,7 @@ class AxonaChatClient {
       name: targetDescriptor.name,
       blurb,
       topicId: targetId,
-      network: 'testnet',
+      network: 'production',
       region: targetDescriptor.region || 'useast',
       mode: targetDescriptor.mode || 'open',
       owner: targetDescriptor.owner || null,

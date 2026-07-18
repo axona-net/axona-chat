@@ -4,9 +4,11 @@ import React, { createContext, useContext, useState } from 'react';
 const NetworkContext = createContext();
 
 export const NetworkProvider = ({ children }) => {
-  // Use wss:// testnet bridge as specified in the quick start guide
-  const [bridgeUrl, setBridgeUrl] = useState('wss://testnet.axona.net');
-  const [network, setNetwork] = useState('testnet'); // or 'production'
+  // Production network. The kernel pin (package.json) must match the kernel
+  // deployed on this bridge; testnet (wss://testnet.axona.net) tracks the
+  // newest kernel line for development.
+  const [bridgeUrl, setBridgeUrl] = useState('wss://bridge.axona.net');
+  const [network, setNetwork] = useState('production'); // or 'testnet'
   const [region, setRegion] = useState('useast');
 
   const value = { 
