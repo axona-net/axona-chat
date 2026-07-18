@@ -1,9 +1,13 @@
 import React from 'react';
-import { useChatStore } from '../stores/useChatStore.js';
+import { useChatStore, getTopicId, countUnread } from '../stores/useChatStore.js';
 import AxonaChatClient from '../services/AxonaChatClient.js';
 
 const ChannelList = ({ onOpenModal }) => {
   const { subscribedTopics, activeTopic, setActiveTopic, removeTopic } = useChatStore();
+  // Subscribe to the slices unread counts derive from, so badges update live.
+  const messages = useChatStore(s => s.messages);
+  const lastRead = useChatStore(s => s.lastRead);
+  const currentHandle = useChatStore(s => s.currentHandle);
 
   const handleSelectChannel = (topic) => {
     setActiveTopic(topic);
@@ -89,6 +93,7 @@ const ChannelList = ({ onOpenModal }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           {subscribedTopics.map((topic, idx) => {
             const isActive = activeTopic && activeTopic.name === topic.name && activeTopic.region === topic.region;
+            const unread = isActive ? 0 : countUnread({ messages, lastRead, currentHandle }, getTopicId(topic));
             return (
               <div
                 key={`${topic.name}-${idx}`}
@@ -133,6 +138,24 @@ const ChannelList = ({ onOpenModal }) => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                  {unread > 0 && (
+                    <span
+                      title={`${unread} unread message${unread === 1 ? '' : 's'}`}
+                      style={{
+                        background: 'var(--color-primary)',
+                        color: '#fff',
+                        borderRadius: '999px',
+                        fontSize: '0.62rem',
+                        fontWeight: '700',
+                        lineHeight: 1,
+                        padding: '3px 6px',
+                        minWidth: '18px',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  )}
                   {topic.privateKey && (
                     <button
                       onClick={(e) => {

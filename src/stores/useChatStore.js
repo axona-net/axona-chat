@@ -5,7 +5,7 @@ import { create } from 'zustand';
 // missing write policy as 'open', so {name:'lobby'} and {name:'lobby',
 // write:'open'} are the same topic on the network and must be the same
 // row here (an ad carries write explicitly; the defaults omit it).
-const getTopicId = (descriptor) => {
+export const getTopicId = (descriptor) => {
   if (!descriptor) return '';
   const region = descriptor.region || 'global';
   const owner = descriptor.owner || '';
@@ -67,6 +67,33 @@ const persistTopics = (topics) => {
   } catch { /* private mode — in-memory only */ }
 };
 
+// Last-read watermarks: topicId -> newest envelope ts the user has SEEN.
+// Persisted so a returning session counts replayed history it never displayed
+// as unread, rather than everything or nothing.
+const loadLastRead = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('axona-last-read') || '{}');
+    return (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch { return {}; }
+};
+const persistLastRead = (map) => {
+  try { localStorage.setItem('axona-last-read', JSON.stringify(map)); } catch { /* */ }
+};
+
+// A message counts toward unread only if the user could actually read it:
+// declared (§6.5 renders undeclared as a stub), not their own, and published
+// after the watermark. Envelope ts is publish time, so replayed history
+// older than the watermark stays read.
+export const countUnread = (state, topicId) => {
+  const mark = state.lastRead[topicId] || 0;
+  const own = state.currentHandle?.authorId;
+  return (state.messages[topicId] || []).filter(m =>
+    m.ts > mark &&
+    m.signerPubkey !== own &&
+    (m.message?.authorClass === 'human' || m.message?.authorClass === 'agent')
+  ).length;
+};
+
 export const useChatStore = create((set, get) => ({
   // Active states
   activeTopic: { region: 'useast', name: 'lobby' }, // Default open channel
@@ -80,7 +107,10 @@ export const useChatStore = create((set, get) => ({
   advertisedTopics: [], // list of topic.ad payloads
 
   // Messages: map of topicId -> array of envelopes
-  messages: {}, 
+  messages: {},
+
+  // Unread tracking: topicId -> ts of the newest message the user has seen
+  lastRead: loadLastRead(),
 
   // Moderation: queue for channel owners
   // Map of outputTopicId -> array of raw channel envelopes awaiting approval
@@ -126,6 +156,23 @@ export const useChatStore = create((set, get) => ({
     // Topic can be a descriptor
     const id = getTopicId(topic);
     set({ activeTopic: topic, activeTopicId: id });
+    get().markTopicRead(id);
+  },
+
+  // Advance the topic's watermark to its newest message ts (the user has now
+  // seen everything displayed). Newest-message ts, NOT Date.now(): replay can
+  // deliver old-ts history late, and a wall-clock watermark would mark those
+  // never-displayed messages read.
+  markTopicRead: (topicId) => {
+    set(state => {
+      const msgs = state.messages[topicId] || [];
+      const newest = msgs.reduce((mx, m) => (m.ts > mx ? m.ts : mx), 0);
+      const mark = newest || Date.now();
+      if ((state.lastRead[topicId] || 0) >= mark) return {};
+      const lastRead = { ...state.lastRead, [topicId]: mark };
+      persistLastRead(lastRead);
+      return { lastRead };
+    });
   },
 
   setSubscribedTopics: (topics) => {
@@ -191,12 +238,21 @@ export const useChatStore = create((set, get) => ({
       const topicMsgs = state.messages[topicId] || [];
       // Prevent duplicates
       if (topicMsgs.some(m => m.msgId === envelope.msgId)) return {};
-      return {
+      const next = {
         messages: {
           ...state.messages,
           [topicId]: [...topicMsgs, envelope]
         }
       };
+      // A message arriving on the topic the user is LOOKING AT is read on
+      // arrival — but only if the tab is actually visible; otherwise it stays
+      // unread until they come back (MessagePane marks read on re-focus).
+      const visible = typeof document === 'undefined' || document.visibilityState === 'visible';
+      if (topicId === state.activeTopicId && visible && envelope.ts > (state.lastRead[topicId] || 0)) {
+        next.lastRead = { ...state.lastRead, [topicId]: envelope.ts };
+        persistLastRead(next.lastRead);
+      }
+      return next;
     });
   },
 

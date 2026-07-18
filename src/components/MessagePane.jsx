@@ -14,6 +14,20 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeEnvelopes.length]);
 
+  // Unread bookkeeping. Arrivals while the tab is VISIBLE are marked read by
+  // the store as they land; this covers the remaining case — messages that
+  // arrived on the active topic while the tab was hidden become read when the
+  // user returns to it.
+  useEffect(() => {
+    const markIfVisible = () => {
+      if (document.visibilityState === 'visible') {
+        useChatStore.getState().markTopicRead(activeTopicId);
+      }
+    };
+    document.addEventListener('visibilitychange', markIfVisible);
+    return () => document.removeEventListener('visibilitychange', markIfVisible);
+  }, [activeTopicId]);
+
   // Nests replies under their parent
   const buildThreadTree = (envelopes) => {
     const map = new Map();

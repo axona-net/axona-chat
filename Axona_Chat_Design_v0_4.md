@@ -248,7 +248,18 @@ Two rules here are normative — presence is where they are most often gotten wr
 1. **Recency comes from the envelope's publish timestamp, never the local clock at delivery.** Subscriptions replay history; a heartbeat that *arrives* now may have been *published* hours ago, and stamping arrival time resurrects long-departed users as "online."
 2. **The presence subscription requests no deep history** (newest-plus-live only). Replaying hours of stale heartbeats is pure noise; and regardless of replay mode, a client keeps the *latest* publish-time per author, never letting an older replayed record overwrite a fresher one.
 
-### 12.2 Topic metrics
+### 12.2 Unread messages
+
+Each topic in the rail shows an **unread badge** — the count of messages the user has not yet seen (capped in display at "99+"). The mechanism is a persisted **last-read watermark** per topic (`axona-last-read` in local storage): the publish timestamp of the newest message the user has displayed.
+
+Rules, in the same spirit as presence:
+
+1. **The watermark is a message timestamp, never the wall clock.** Marking read stamps the newest *displayed* message's publish ts. Replay can deliver older history late; a wall-clock watermark would silently mark those never-seen messages read.
+2. **A message counts as unread only if the user could actually read it**: it must carry a §6.5 declaration (undeclared messages render as stubs), must not be self-authored, and its publish ts must exceed the watermark.
+3. **Read on sight, not on arrival.** The active topic's arrivals are marked read only while the tab is visible; messages landing while the tab is hidden stay unread until the user returns (visibility change marks the active topic read). Switching to a topic marks it read.
+4. Persistence means a returning session counts replayed history it never displayed as unread — a fresh device shows the full backlog as unread once, which is the truth.
+
+### 12.3 Topic metrics
 
 The topic header shows a live message count ("📊 N messages") by subscribing to the kernel's **derived metric topic** for the active topic (the descriptor returned by `metricTopic(<topic-id-hex>)`; derive the hex ID from the full descriptor first). Snapshots carry `current_count` among other counters. The metrics discipline stands: **silence renders as UNKNOWN ("… messages"), never as zero** — only an explicit `current_count: 0` means quiet; first snapshot arrives seconds after subscribing; metrics are advisory, unauthenticated, never a security input.
 
@@ -383,6 +394,7 @@ A build is correct when all of the following pass. They are ordered so that the 
 18. **Firefox:** all of the above pass in Firefox against the dev server. (If they fail in Firefox only, re-read §17.)
 19. **Long-message paging:** a message several screens tall renders inside the fixed-height panel with working Previous/Next controls and a page indicator; it never grows an inner scrollbar; a short message shows no paging chrome.
 20. **Ad retraction:** A advertises a topic; the ✕ appears on that ad in A's browse panel but NOT in B's; A retracts through the two-step confirm; the ad disappears from DISCOVER on A *and* on B without either reloading.
+21. **Unread badges:** B posts to a topic A is subscribed to but not viewing — a badge with the count appears on that topic in A's rail and increments on further posts; A switches to the topic — the badge clears; A reloads — it stays cleared (watermark persisted); messages A posted never count.
 
 ---
 
