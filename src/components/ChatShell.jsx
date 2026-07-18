@@ -51,6 +51,20 @@ const ChatShell = () => {
     const inviteTopic = params.get('t');
     const inviteKey = params.get('k');
 
+    // Deep link to a public topic: axona.chat?topic=<name>[&region=<region>].
+    // URLSearchParams decodes %20/+ so legacy spaced names still reach the
+    // right topic when properly encoded; newly created names carry no spaces.
+    const linkedTopic = params.get('topic');
+    if (linkedTopic && linkedTopic.trim() && !(inviteTopic && inviteKey)) {
+      const linkedRegion = params.get('region') || 'useast';
+      window.history.replaceState({}, document.title, window.location.pathname);
+      const descriptor = { region: linkedRegion, name: linkedTopic.trim(), write: 'open' };
+      useChatStore.getState().addTopic(descriptor);
+      useChatStore.getState().setActiveTopic(descriptor);
+      AxonaChatClient.reconcileSubscriptions();
+      return;
+    }
+
     if (inviteTopic && inviteKey) {
       // Clear query params from the URL so reloading doesn't prompt again
       window.history.replaceState({}, document.title, window.location.pathname);

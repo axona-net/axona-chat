@@ -232,12 +232,14 @@ const Modals = ({ activeModal, onClose }) => {
             <h3 style={{ fontFamily: 'Outfit, sans-serif', marginBottom: '1rem' }}>Create Topic</h3>
             <form onSubmit={handleCreateChannel} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.25rem' }}>Topic Name</label>
+                <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.25rem' }}>
+                  Topic Name <span style={{ fontWeight: 'normal' }}>(no spaces — so links like axona.chat?topic=name work; dashes are substituted)</span>
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. Retro Gaming"
+                  placeholder="e.g. retro-gaming"
                   value={chanName}
-                  onChange={(e) => setChanName(e.target.value)}
+                  onChange={(e) => setChanName(e.target.value.replace(/\s+/g, '-'))}
                   style={inputStyle}
                   required
                 />

@@ -105,7 +105,9 @@ The store keys UI state by a canonical string of the full tuple, so the same ker
 
 ### 5.3 Creating and joining
 
-**Create new topic** prompts for name, description, and mode; a moderated topic records the creator's author ID as owner. **Join by link/ID** accepts either a plain name (joined as an open `useast` topic) or a pasted full descriptor in JSON form. Clicking a ticker advertisement joins using the complete descriptor the ad carries.
+**Create new topic** prompts for name, description, and mode; a moderated topic records the creator's author ID as owner. **Created topic names contain no whitespace** — the create field substitutes a dash for any space as the user types, and the label says why. This is normative: spaced names break plain-text topic links (`axona.chat?topic=axona dev` truncates at the space in most contexts). Join, by contrast, stays permissive — **Join by link/ID** accepts either a plain name (joined as an open `useast` topic, spaces allowed so legacy spaced topics remain reachable) or a pasted full descriptor in JSON form. Clicking a ticker advertisement joins using the complete descriptor the ad carries.
+
+**Deep link:** `axona.chat?topic=<name>[&region=<region>]` joins and opens that topic as an open channel on launch (region defaults to `useast`); the query is then cleared from the URL. Percent-encoded names decode normally, so properly encoded legacy spaced names still resolve. The `?t=…&k=…` private-invite link (§9.1) takes precedence when both are present.
 
 ### 5.4 Region
 
