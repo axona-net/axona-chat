@@ -5,9 +5,11 @@ import { readFileSync } from 'fs'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
-export default defineConfig(({ command }) => ({
-  // Production builds deploy to GitHub Pages at /axona-chat/; dev stays at /.
-  base: command === 'build' ? '/axona-chat/' : '/',
+export default defineConfig(() => ({
+  // Served at the domain root: the custom domain axona.chat fronts the
+  // GitHub Pages deployment (the old axona-net.github.io/axona-chat URL
+  // redirects there).
+  base: '/',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version)
   },

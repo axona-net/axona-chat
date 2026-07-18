@@ -351,6 +351,7 @@ This section is normative. A protocol operation named in prose elsewhere in this
 - **Browser-only bundling:** the kernel's Node-side WebRTC dependency (`node-datachannel`) must be aliased to an inert empty stub in the bundler config so browser builds resolve cleanly; the kernel never executes that path in a browser.
 - **Kernel upgrades:** after changing the kernel pin, clear Vite's dependency pre-bundle cache and restart the dev server — the stale-cache failure mode (old kernel silently served) has bitten twice.
 - **PWA, client-only, no SSR** (§2.3). Production serves over HTTPS on a real host, where the `::1` issue does not apply.
+- **Hosting:** the app deploys as a static bundle (GitHub Pages) fronted by the custom domain **axona.chat**, built with base `/` (served at the domain root). Share/QR links derive from `origin + pathname`, so they follow whatever host the app is served from.
 
 ---
 
