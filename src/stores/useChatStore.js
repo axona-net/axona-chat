@@ -179,6 +179,13 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
+  // A retracted ad's deletion marker arrives with the ad's msgId.
+  removeAdvertisement: (msgId) => {
+    set(state => ({
+      advertisedTopics: state.advertisedTopics.filter(item => item.msgId !== msgId)
+    }));
+  },
+
   addEnvelope: (topicId, envelope) => {
     set(state => {
       const topicMsgs = state.messages[topicId] || [];

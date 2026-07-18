@@ -3,9 +3,21 @@ import { useChatStore } from '../stores/useChatStore.js';
 import AxonaChatClient from '../services/AxonaChatClient.js';
 
 const TopicTicker = () => {
-  const { advertisedTopics, tickerVisible, setTickerVisible, addTopic, setActiveTopic } = useChatStore();
+  const { advertisedTopics, tickerVisible, setTickerVisible, addTopic, setActiveTopic, currentHandle } = useChatStore();
   const [isPaused, setIsPaused] = useState(false);
   const [showBrowse, setShowBrowse] = useState(false);
+  // Two-step inline confirm for ad retraction (msgId of the ad being confirmed)
+  const [confirmRetract, setConfirmRetract] = useState(null);
+
+  const handleRetractAd = async (ad) => {
+    try {
+      await AxonaChatClient.retractAdvertisement(ad);
+    } catch (err) {
+      alert('ad retraction failed: ' + err.message);
+    } finally {
+      setConfirmRetract(null);
+    }
+  };
 
   const handleToggle = () => {
     const next = !tickerVisible;
@@ -136,6 +148,26 @@ const TopicTicker = () => {
                     }}>
                       {ad.mode}
                     </span>
+                    {/* Retract control — only on ads the ACTIVE persona signed
+                        (mirrors §11 message retraction: authority follows the
+                        key). stopPropagation so it doesn't join the topic. */}
+                    {ad.signer && currentHandle && ad.signer === currentHandle.authorId && (
+                      confirmRetract === ad.msgId ? (
+                        <span style={{ display: 'inline-flex', gap: '0.3rem', alignItems: 'center', marginLeft: 'auto' }} onClick={(e) => e.stopPropagation()}>
+                          <span style={{ color: 'var(--color-muted)', fontSize: '0.65rem' }}>Retract ad?</span>
+                          <button onClick={() => handleRetractAd(ad)} style={{ background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '3px', padding: '0 5px', fontSize: '0.62rem', cursor: 'pointer', fontWeight: '600' }}>Yes</button>
+                          <button onClick={() => setConfirmRetract(null)} style={{ background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--border-color)', borderRadius: '3px', padding: '0 5px', fontSize: '0.62rem', cursor: 'pointer' }}>No</button>
+                        </span>
+                      ) : (
+                        <span
+                          onClick={(e) => { e.stopPropagation(); setConfirmRetract(ad.msgId); }}
+                          title="Retract this advertisement (yours)"
+                          style={{ marginLeft: 'auto', color: '#e74c3c', cursor: 'pointer', fontSize: '0.72rem' }}
+                        >
+                          ✕
+                        </span>
+                      )
+                    )}
                   </div>
                   <div style={{ fontSize: '0.74rem', color: 'var(--color-muted)', marginTop: '2px' }}>{ad.blurb}</div>
                 </div>

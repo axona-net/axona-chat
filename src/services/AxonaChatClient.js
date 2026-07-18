@@ -124,7 +124,13 @@ class AxonaChatClient {
 
       const sub = await this.peer.sub(descriptor, (envelope) => {
         if (envelope.deleted) {
-          useChatStore.getState().killMessage(getTopicId(descriptor), envelope.msgId);
+          // A retracted ad must disappear from DISCOVER live on every
+          // client, not linger until the ticker's hold time expires.
+          if (isTicker) {
+            useChatStore.getState().removeAdvertisement(envelope.msgId);
+          } else {
+            useChatStore.getState().killMessage(getTopicId(descriptor), envelope.msgId);
+          }
           return;
         }
 
@@ -160,10 +166,12 @@ class AxonaChatClient {
           });
         }
 
-        // Ticker delivery
+        // Ticker delivery. Carry the envelope's msgId + signer with the ad:
+        // retraction needs the msgId to kill and the signer to know whose
+        // key may kill it — the payload alone has neither.
         if (isTicker) {
           if (processedPayload && processedPayload.type === 'topic.ad') {
-            useChatStore.getState().addAdvertisement(processedPayload);
+            useChatStore.getState().addAdvertisement({ ...processedPayload, msgId: envelope.msgId, signer: senderId });
           }
           return;
         }
@@ -446,6 +454,18 @@ class AxonaChatClient {
     };
 
     await this.peer.pub(this.tickerTopic, payload, { signWith: activeAuthor });
+  }
+
+  /** Retract an advertisement the ACTIVE persona published: owner-signed kill
+   *  on the ticker topic. Other clients drop the ad via the deletion marker. */
+  async retractAdvertisement(ad) {
+    if (!this.peer || !ad?.msgId) throw new Error('ad has no msgId (received before v0.13.0 — it will age out on its own)');
+    const activeAuthor = await this.getActiveAuthor();
+    if (!activeAuthor || activeAuthor.authorId !== ad.signer) {
+      throw new Error('only the persona that published an ad can retract it');
+    }
+    await this.peer.kill(this.tickerTopic, ad.msgId, { signWith: activeAuthor });
+    useChatStore.getState().removeAdvertisement(ad.msgId);   // optimistic local removal
   }
 
   startPresenceHeartbeat() {
