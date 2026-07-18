@@ -81,9 +81,16 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
   const renderEmbeds = (text) => {
     if (typeof text !== 'string') return null;
 
+    // URLs in markdown bodies arrive wrapped in punctuation the regex can't
+    // know isn't part of the URL — **https://x** captures the trailing
+    // asterisks, (https://x) the paren, "https://x." the period — and the
+    // preview then fetches a mangled address. Strip trailing markdown/prose
+    // punctuation from every match.
+    const cleanUrl = (u) => u.replace(/[*_~`)\]}>.,;:!?'"]+$/, '');
+
     // Match image extensions
-    const imgRegex = /(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp|svg))/gi;
-    const imgMatches = text.match(imgRegex);
+    const imgRegex = /(https?:\/\/\S*\.(?:png|jpg|jpeg|gif|webp|svg))/gi;
+    const imgMatches = (text.match(imgRegex) || []).map(cleanUrl);
 
     // Match youtube links
     const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
@@ -91,7 +98,7 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
 
     // Match general HTTP/HTTPS URLs (and exclude direct images/youtube links)
     const urlRegex = /https?:\/\/[^\s<>\"]+/gi;
-    const allUrls = text.match(urlRegex) || [];
+    const allUrls = (text.match(urlRegex) || []).map(cleanUrl);
     const previewUrls = [...new Set(allUrls.filter(url => {
       const isImg = /\.(?:png|jpg|jpeg|gif|webp|svg)/i.test(url);
       const isYt = /(?:youtube\.com\/watch\?v=|youtu\.be\/)/i.test(url);
