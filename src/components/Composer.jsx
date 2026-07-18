@@ -483,6 +483,7 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
                   onClick={() => setIsExpanded(false)}
+                  title="Close the editor without sending — your draft is kept and reopens where you left off"
                   style={{
                     padding: '0.4rem 1rem',
                     background: 'rgba(255,255,255,0.04)',
@@ -495,11 +496,12 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
                 >
                   Draft
                 </button>
-                <button 
+                <button
+                  title="Publish your message to this topic (Ctrl+Enter)"
                   onClick={async () => {
                     await handleSend();
                     setIsExpanded(false); // Auto collapse after send
-                  }} 
+                  }}
                   style={{
                     padding: '0.4rem 1.2rem',
                     background: 'var(--color-primary)',

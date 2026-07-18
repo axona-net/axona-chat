@@ -231,6 +231,7 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
+            title="This message is long — page back up through it"
             style={{
               padding: '0.15rem 0.6rem', borderRadius: '4px', cursor: page === 0 ? 'default' : 'pointer',
               border: '1px solid var(--border-color)', background: 'transparent',
@@ -243,6 +244,7 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
           <button
             onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}
             disabled={page >= pageCount - 1}
+            title="This message is long — page down through it"
             style={{
               padding: '0.15rem 0.6rem', borderRadius: '4px', cursor: page >= pageCount - 1 ? 'default' : 'pointer',
               border: '1px solid var(--border-color)', background: 'transparent',
@@ -256,8 +258,9 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
 
       {/* Action Footer */}
       <div style={{ display: 'flex', gap: '1rem', marginTop: '0.2rem', justifyContent: 'flex-end', fontSize: '0.7rem' }}>
-        <span 
-          onClick={() => onReply(envelope)} 
+        <span
+          onClick={() => onReply(envelope)}
+          title="Reply publicly — your reply appears nested under this message"
           style={{ color: 'var(--color-muted)', cursor: 'pointer', transition: 'color 0.2s' }}
           onMouseEnter={(e) => e.target.style.color = 'var(--color-primary)'}
           onMouseLeave={(e) => e.target.style.color = 'var(--color-muted)'}
@@ -267,8 +270,9 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
 
         {/* Can private-reply if not own message */}
         {!isOwn && (
-          <span 
-            onClick={() => onPrivateReply(envelope)} 
+          <span
+            onClick={() => onPrivateReply(envelope)}
+            title="Reply privately — only this message's author can read it, and it can open a private channel between you"
             style={{ color: 'var(--color-muted)', cursor: 'pointer', transition: 'color 0.2s' }}
             onMouseEnter={(e) => e.target.style.color = 'var(--color-success)'}
             onMouseLeave={(e) => e.target.style.color = 'var(--color-muted)'}
@@ -313,8 +317,9 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
               </button>
             </span>
           ) : (
-            <span 
-              onClick={() => setShowConfirm(true)} 
+            <span
+              onClick={() => setShowConfirm(true)}
+              title="Take back your message — it is removed for everyone, not just you"
               style={{ color: '#e74c3c', cursor: 'pointer' }}
             >
               Retract (✕)

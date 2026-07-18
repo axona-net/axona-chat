@@ -41,9 +41,10 @@ const ChannelList = ({ onOpenModal }) => {
       height: '100%'
     }}>
       {/* Top Brand Logo - Clickable to open About Protocol Modal */}
-      <div 
+      <div
         onClick={() => onOpenModal('about')}
-        style={{ 
+        title="What is Axona Chat? Click for a short explanation of the app and the network it runs on"
+        style={{
           paddingBottom: '0.65rem', 
           borderBottom: '1px solid rgba(255,255,255,0.08)',
           marginBottom: '1rem',
@@ -76,14 +77,14 @@ const ChannelList = ({ onOpenModal }) => {
             <button 
               onClick={() => onOpenModal('join')} 
               style={{ padding: '2px 6px', fontSize: '0.7rem', background: 'rgba(255,255,255,0.03)' }}
-              title="Join by link/ID"
+              title="Join a topic by typing its name, or paste a topic link someone shared with you"
             >
               Join
             </button>
             <button 
               onClick={() => onOpenModal('create')} 
               style={{ padding: '2px 6px', fontSize: '0.7rem', background: 'var(--color-primary-dark)', color: '#fff' }}
-              title="Create new topic"
+              title="Start a new topic — open (anyone can post) or moderated (you approve posts before they appear)"
             >
               + New
             </button>
@@ -176,7 +177,7 @@ const ChannelList = ({ onOpenModal }) => {
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-primary-light)'}
                       onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-muted)'}
-                      title="Rename local connection label"
+                      title="Rename this private channel — the name is just for you, the other person keeps their own"
                     >
                       ✏️
                     </button>
@@ -199,7 +200,7 @@ const ChannelList = ({ onOpenModal }) => {
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.color = '#ff6b6b'}
                     onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-muted)'}
-                    title="Unsubscribe from topic"
+                    title="Leave this topic — it disappears from your list, and you can rejoin anytime"
                   >
                     ✕
                   </button>

@@ -407,9 +407,9 @@ const Modals = ({ activeModal, onClose }) => {
         {/* 4. Advertise Modal */}
         {activeModal === 'advertise' && (
           <div>
-            <h3 style={{ fontFamily: 'Outfit, sans-serif', marginBottom: '1rem' }}>Advertise Topic</h3>
+            <h3 style={{ fontFamily: 'Outfit, sans-serif', marginBottom: '1rem' }}>Invite others to this topic</h3>
             <p style={{ color: 'var(--color-muted)', fontSize: '0.8rem', marginBottom: '1rem' }}>
-              Publish an advertisement record to the global ticker topic so other users can discover this channel.
+              This shares your topic on the DISCOVER ticker that everyone on the network sees, so people can find it and join the conversation. Write a short blurb saying what the topic is about. You can take the invitation back later (the ✕ next to your ad in DISCOVER), and it naturally expires after a day or two.
             </p>
             <form onSubmit={handlePostAd} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>

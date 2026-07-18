@@ -81,7 +81,7 @@ const TopicTicker = () => {
           motion; the panel lets you read and pick at leisure). */}
       <button
         onClick={() => setShowBrowse(!showBrowse)}
-        title="Browse all advertised topics"
+        title="See every topic people have shared on the network — click any to join the conversation"
         style={{
           fontWeight: 'bold',
           color: 'var(--color-primary)',
@@ -199,9 +199,10 @@ const TopicTicker = () => {
             <span style={{ color: 'var(--color-muted)' }}>No topics advertised yet. Create a topic and advertise it!</span>
           ) : (
             advertisedTopics.map((ad, idx) => (
-              <div 
-                key={`${ad.topicId}-${idx}`} 
+              <div
+                key={`${ad.topicId}-${idx}`}
                 onClick={() => handleOpenAd(ad)}
+                title={`Click to join #${ad.name}`}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -232,8 +233,9 @@ const TopicTicker = () => {
         </div>
       </div>
 
-      <button 
-        onClick={handleToggle} 
+      <button
+        onClick={handleToggle}
+        title="Hide the scrolling topic tape — you can bring it back anytime"
         style={{
           padding: '0.1rem 0.4rem',
           fontSize: '0.7rem',

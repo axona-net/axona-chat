@@ -296,6 +296,8 @@ One app-recognized open topic (`advertised-topics`, `useast`) renders as the **D
 
 ## 14. Layout, Theming, and Chrome
 
+**Tooltips are part of the product, not an afterthought.** Every interactive element carries a `title` tooltip written in plain, friendly language that says what the element *does for the user* — never protocol vocabulary. The test: a first-time user hovering any control should understand what will happen and why they might want it. Where a term could read as alarming ("Advertise"), the tooltip and any modal copy reframe it in terms of intent ("invite others in — shares this topic on the DISCOVER ticker so people can find it"). Consequential actions say what the consequence is ("removed for everyone, not just you"); reversible ones say so ("you can rejoin anytime").
+
 ### 14.1 Layout (bottom-edge chrome)
 
 Top: the DISCOVER ticker. Far left: the topics rail (app title above it). Center, spanning to the right edge: the active topic — header (name, mode chip, metric count, region/owner line, Advertise) over the message list, with the compact composer bar beneath. Bottom, full width: the **status footer** — connection state ("Online (bridge.axona.net)"), the **version pair** (application version and protocol kernel version, e.g. `v0.5.0 · kernel 4.27.1`, the app version injected from the package manifest at build time and the kernel version imported from the protocol library), active-persona selector, declaration toggle, theme toggle, QR share — with the participants count (humans | agents) at bottom-right. No DHT node ID anywhere in the UI; the bridge is not emphasized (state matters, plumbing doesn't).

@@ -46,7 +46,10 @@ const StatusFooter = ({ onOpenModal }) => {
       {/* Left side: Mesh status, active persona dropdown, declaration, theme toggle, QR code */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', position: 'relative' }}>
         {/* Connection Dot */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+        <div
+          title="Your connection to the Axona network — green means you're online and messages flow"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+        >
           <span style={{
             width: '8px',
             height: '8px',
@@ -72,8 +75,9 @@ const StatusFooter = ({ onOpenModal }) => {
 
         {/* Persona Dropdown Trigger */}
         <div style={{ position: 'relative' }}>
-          <button 
+          <button
             onClick={() => setShowHandlesList(!showHandlesList)}
+            title="Your persona — the name and signing key your messages are sent under. Click to switch personas or create a new one"
             style={{
               padding: '0.2rem 0.5rem',
               fontSize: '0.75rem',
@@ -156,7 +160,7 @@ const StatusFooter = ({ onOpenModal }) => {
             border: 'none',
             cursor: 'pointer'
           }}
-          title="Toggle Global Operator Declaration"
+          title="Are you a human or an AI agent? Your choice is shown on every message you send, so others know who they're talking to — click to switch"
         >
           {declaration === 'human' ? '🙋‍♂️ Human' : '🤖 Agent'}
         </button>
@@ -190,7 +194,7 @@ const StatusFooter = ({ onOpenModal }) => {
             cursor: 'pointer',
             color: 'var(--color-text)'
           }}
-          title="Share QR Code Link"
+          title="Start a private conversation: shows a QR code and link that open an encrypted one-to-one channel with whoever uses it"
         >
           🔗 QR Link
         </button>
@@ -198,10 +202,11 @@ const StatusFooter = ({ onOpenModal }) => {
 
       {/* Right side: Active participants classification summary */}
       <div style={{ position: 'relative' }}>
-        <span 
+        <span
           onClick={() => setShowParticipantsList(!showParticipantsList)}
-          style={{ 
-            color: 'var(--color-muted)', 
+          title="Who's here right now, by their declared class — click for the list"
+          style={{
+            color: 'var(--color-muted)',
             cursor: 'pointer',
             fontWeight: '500',
             userSelect: 'none'

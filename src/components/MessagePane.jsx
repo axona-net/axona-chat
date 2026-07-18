@@ -122,7 +122,9 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
             }}>
               {activeTopic.mode || 'open'}
             </span>
-            <span style={{
+            <span
+              title="How many messages this topic currently holds on the network ('…' means the count hasn't arrived yet)"
+              style={{
               fontSize: '0.65rem',
               padding: '1px 5px',
               borderRadius: '3px',
@@ -148,6 +150,7 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
           {activeTopic.name !== 'advertised-topics' && (
             <button
               onClick={() => onOpenModal('advertise')}
+              title="Invite others in: this shares the topic on the DISCOVER ticker so anyone on the network can find it and join the conversation"
               style={{
                 fontSize: '0.75rem',
                 padding: '0.3rem 0.6rem',
@@ -165,6 +168,7 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
           {activeTopic.mode === 'controlled' && isOwner && (
             <button
               onClick={() => onOpenModal('acl')}
+              title="Manage who is allowed to post in this topic"
               style={{
                 fontSize: '0.75rem',
                 padding: '0.3rem 0.6rem',
@@ -181,6 +185,7 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
           {activeTopic.mode === 'moderated' && isOwner && (
             <button
               onClick={() => onOpenModal('moderation')}
+              title="Review messages people have submitted to this moderated topic — approve the ones to publish"
               style={{
                 fontSize: '0.75rem',
                 padding: '0.3rem 0.6rem',
