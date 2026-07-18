@@ -12,6 +12,15 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
   // so compare against the active topic's hex id (same derivation the network
   // uses — immune to region-name spelling like useast vs its canonical name).
   // Retracting/expiring the ad removes it from the store → button re-enables.
+  // Mobile: the floating "☰ Topics" pill sits over the header's top-left, so
+  // indent the header content past it (same 800px threshold as ChatShell).
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 800);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 800);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const [activeHexId, setActiveHexId] = useState(null);
   useEffect(() => {
     let stale = false;
@@ -118,6 +127,7 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0.6rem 1rem',
+        paddingLeft: isMobile ? '7rem' : '1rem',
         background: 'var(--color-surface)',
         borderBottom: '1px solid var(--border-color)',
         gap: '1rem',
