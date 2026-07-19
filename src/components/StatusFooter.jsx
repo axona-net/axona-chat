@@ -77,14 +77,12 @@ const StatusFooter = ({ onOpenModal }) => {
               ({bridgeUrl.replace('wss://', '').replace('https://', '')})
             </span>
           )}
-          {!isMobile && (
-            <span
-              title="Application version · Axona protocol kernel version"
-              style={{ color: 'var(--color-muted)', fontSize: '0.68rem', fontFamily: 'monospace' }}
-            >
-              v{APP_VERSION} · kernel {KERNEL_VERSION}
-            </span>
-          )}
+          <span
+            title="Application version · Axona protocol kernel version"
+            style={{ color: 'var(--color-muted)', fontSize: '0.68rem', fontFamily: 'monospace', whiteSpace: 'nowrap' }}
+          >
+            v{APP_VERSION} · kernel {KERNEL_VERSION}
+          </span>
         </div>
 
         {!isMobile && <span style={{ color: 'var(--border-color)', opacity: 0.5 }}>|</span>}

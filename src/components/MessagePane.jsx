@@ -6,7 +6,15 @@ import AxonaChatClient from '../services/AxonaChatClient.js';
 const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => {
   const { activeTopic, activeTopicId, messages, currentHandle, moderationQueue, topicMetrics } = useChatStore();
   const advertisedTopics = useChatStore(s => s.advertisedTopics);
-  const messagesEndRef = useRef(null);
+  const listRef = useRef(null);
+  const contentRef = useRef(null);
+  const pinnedRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
+
+  const scrollToBottom = (behavior = 'smooth') => {
+    const el = listRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior });
+  };
 
   // ONE advertisement per topic. Ads carry the kernel-derived hex topic id,
   // so compare against the active topic's hex id (same derivation the network
@@ -37,8 +45,22 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeEnvelopes.length]);
+    pinnedRef.current = true;
+    scrollToBottom();
+  }, [activeEnvelopes.length, activeTopicId]);
+
+  // The tile's content (markdown, link previews, images) finishes laying out
+  // AFTER the scroll above computes its target, which left the last tile
+  // slightly cut off. Re-pin on any content-height change while the user is
+  // at the bottom; a reader scrolled up is never yanked down.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => { if (pinnedRef.current) scrollToBottom('auto'); });
+    ro.observe(el);
+    if (contentRef.current) ro.observe(contentRef.current);
+    return () => ro.disconnect();
+  }, [activeEnvelopes.length > 0]);
 
   // Unread bookkeeping. Arrivals while the tab is VISIBLE are marked read by
   // the store as they land; this covers the remaining case — messages that
@@ -249,7 +271,15 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
       </div>
 
       {/* Message List area */}
-      <div style={{
+      <div ref={listRef} onScroll={() => {
+        const el = listRef.current;
+        if (!el) return;
+        // Only an UPWARD scroll unpins — a smooth scroll-to-bottom animation
+        // passes through far-from-bottom positions and must not unpin itself.
+        if (el.scrollTop < lastScrollTopRef.current - 4) pinnedRef.current = false;
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 48) pinnedRef.current = true;
+        lastScrollTopRef.current = el.scrollTop;
+      }} style={{
         flex: 1,
         overflowY: 'auto',
         padding: '1rem',
@@ -271,9 +301,10 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
             <span style={{ fontSize: '0.8rem' }}>Be the first to speak!</span>
           </div>
         ) : (
-          renderThreadNodes(threadTree)
+          <div ref={contentRef}>
+            {renderThreadNodes(threadTree)}
+          </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
     </div>
   );
