@@ -160,18 +160,23 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-text)', margin: 0 }}>
               #{activeTopic.name}
             </h3>
-            <span style={{
-              fontSize: '0.6rem',
-              padding: '1px 5px',
-              borderRadius: '3px',
-              background: activeTopic.mode === 'moderated' ? '#e67e22' : activeTopic.mode === 'controlled' ? '#9b59b6' : 'var(--color-bg)',
-              color: (activeTopic.mode === 'open' || !activeTopic.mode) ? 'var(--color-muted)' : '#fff',
-              border: (activeTopic.mode === 'open' || !activeTopic.mode) ? '1px solid var(--border-color)' : 'none',
-              fontWeight: '600',
-              textTransform: 'uppercase'
-            }}>
-              {activeTopic.mode || 'open'}
-            </span>
+            {(() => {
+              const mode = activeTopic.mode || (activeTopic.write === 'owner' ? 'controlled' : 'open');
+              return (
+                <span style={{
+                  fontSize: '0.6rem',
+                  padding: '1px 5px',
+                  borderRadius: '3px',
+                  background: mode === 'moderated' ? '#e67e22' : mode === 'controlled' ? '#9b59b6' : 'var(--color-bg)',
+                  color: mode === 'open' ? 'var(--color-muted)' : '#fff',
+                  border: mode === 'open' ? '1px solid var(--border-color)' : 'none',
+                  fontWeight: '600',
+                  textTransform: 'uppercase'
+                }}>
+                  {mode}
+                </span>
+              );
+            })()}
             <span
               title="How many messages this topic currently holds on the network ('…' means the count hasn't arrived yet)"
               style={{

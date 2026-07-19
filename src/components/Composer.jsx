@@ -32,7 +32,14 @@ const ToolbarButton = ({ onClick, label, active = false }) => (
 
 const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
   const { activeTopic } = useChatStore();
-  const { declaration } = useHandle();
+  const { declaration, activeHandle } = useHandle();
+
+  // Controlled (owner-write) topic: only the owner's key can publish — the
+  // network enforces this at the roots, so don't offer an editor that can
+  // only end in a rejection.
+  const ownerLocked = (activeTopic?.write === 'owner' || activeTopic?.mode === 'controlled')
+    && !!activeTopic?.owner
+    && activeTopic.owner !== activeHandle?.authorId;
   const [isExpanded, setIsExpanded] = useState(false);
   const [rawMarkdown, setRawMarkdown] = useState('');
   const [isRawView, setIsRawView] = useState(false);
@@ -56,6 +63,11 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
       setRawMarkdown(editor.getMarkdown());
     }
   });
+
+  // Switching onto a locked topic while composing closes the editor
+  useEffect(() => {
+    if (ownerLocked) setIsExpanded(false);
+  }, [ownerLocked]);
 
   // Autofocus when modal expands
   useEffect(() => {
@@ -261,15 +273,17 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
         )}
 
         <div
-          onClick={() => setIsExpanded(true)}
-          onDragOver={handleDragOver}
-          onDrop={handleFileDrop}
+          onClick={ownerLocked ? undefined : () => setIsExpanded(true)}
+          onDragOver={ownerLocked ? undefined : handleDragOver}
+          onDrop={ownerLocked ? undefined : handleFileDrop}
+          title={ownerLocked ? 'Only this topic’s owner can publish here' : undefined}
           style={{
             padding: '0.55rem 0.8rem',
             background: 'var(--color-surface)',
             border: '1px solid var(--border-color)',
             borderRadius: 'var(--radius)',
-            cursor: 'pointer',
+            cursor: ownerLocked ? 'not-allowed' : 'pointer',
+            opacity: ownerLocked ? 0.75 : 1,
             minHeight: '38px',
             display: 'flex',
             alignItems: 'center',
@@ -277,12 +291,14 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
             fontSize: '0.85rem',
             transition: 'border-color 0.2s'
           }}
-          onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
-          onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+          onMouseEnter={ownerLocked ? undefined : (e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
+          onMouseLeave={ownerLocked ? undefined : (e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
         >
-          {editor && editor.getText().trim() 
-            ? <span style={{ color: 'var(--color-text)' }}>{editor.getText().slice(0, 100)}...</span>
-            : <span>Type a message... (Click to open markdown formatting composer)</span>
+          {ownerLocked
+            ? <span>🔒 Controlled topic — posting is not enabled.</span>
+            : editor && editor.getText().trim()
+              ? <span style={{ color: 'var(--color-text)' }}>{editor.getText().slice(0, 100)}...</span>
+              : <span>Type a message... (Click to open markdown formatting composer)</span>
           }
         </div>
       </div>
