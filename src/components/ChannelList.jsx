@@ -2,6 +2,8 @@ import React from 'react';
 import { useChatStore, getTopicId, countUnread } from '../stores/useChatStore.js';
 import AxonaChatClient from '../services/AxonaChatClient.js';
 
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
+
 const ChannelList = ({ onOpenModal }) => {
   const { subscribedTopics, activeTopic, setActiveTopic, removeTopic } = useChatStore();
   // Subscribe to the slices unread counts derive from, so badges update live.
@@ -65,7 +67,7 @@ const ChannelList = ({ onOpenModal }) => {
           AXONA CHAT
         </h2>
         <span style={{ fontSize: '0.65rem', color: 'var(--color-muted)', display: 'block' }}>
-          PEER-TO-PEER · v0.3
+          PEER-TO-PEER · v{APP_VERSION}
         </span>
       </div>
 
