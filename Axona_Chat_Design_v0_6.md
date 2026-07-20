@@ -1,20 +1,55 @@
 # Axona Chat — Design Document
 
-**Version 0.5 · Targets kernel 4.27.1 / wire 4.0 · David A. Smith**
+**Version 0.6 · Targets kernel 4.30.0 / wire 4.0 · David A. Smith**
 
-*v0.5 (2026-07-18) consolidates the app's v0.11–v0.15 feature work: no-space topic names + deep links (§5.3), advertisement retraction (§13), unread badges with persisted last-read watermarks (§12.2), spaced-name ad sunset (§13), and the shareable link-preview card (§17). Updated 2026-07-18 (app v0.20.0–0.20.1): width discipline made normative (§7.6) after a field report of unreadable wide messages on phones; acceptance test 23 extended to match.*
+*v0.6 (2026-07-20) restructures the document around the kernel's two-tier AI
+documentation (see Prerequisites) — protocol call shapes and network behavior
+are no longer re-taught here — and consolidates the app's v0.22–v0.23 work:
+message-list scroll discipline (§7.7), the controlled-topic composer lock
+(§11.1), and version display at every width (§14.1). Acceptance tests 25–26
+added; test 23 amended.*
 
-A decentralized topic-based chat application built on the Axona protocol, in which humans and AI agents participate as first-class peers on equal terms. No servers, no accounts, no central operator.
+A decentralized topic-based chat application built on the Axona protocol, in
+which humans and AI agents participate as first-class peers on equal terms.
+No servers, no accounts, no central operator.
 
-This document is a complete, self-sufficient build brief: every feature, every protocol interaction, and every rule needed to produce the working application, with nothing assumed from any other design material. An AI coding agent (or a human) given this document plus the kernel's **AI Grounding** file for the targeted kernel version has everything required to build it correctly.
+## Prerequisites — read before this document
 
-Four disciplines are woven through the sections below because they are the four ways generated implementations of distributed applications most often go wrong: an API call shaped from prose rather than its exact signature; a single-client mental model applied to a multi-client system; a silent fallback invented to keep the UI alive; and a missing primitive simulated instead of surfaced. Section 16 states the protocol contract exactly; Section 18 gives the acceptance tests — several requiring two simultaneous clients — that distinguish a correct build from a merely plausible one.
+This build brief **assumes the builder already has the kernel's AI
+documentation pair in context** (axona-docs/programmer-guide, matching the
+targeted kernel version):
+
+- **AI Grounding** (tier 1) — the hard rules, exact call shapes, canonical
+  bootstrap, error codes, and field-observed mistakes. It is the sole
+  authority on **how every protocol call is shaped**; prose in this document
+  never licenses a guessed signature.
+- **AI Reference** (tier 2) — the complete API surface and, critically, the
+  **behavioral model** (§18 there): delivery timing, replay semantics, root
+  healing, the publish path, and the storage model. Consult it before
+  concluding any observed network behavior is a defect.
+
+This document therefore contains only what those files cannot: the
+**application design** — what to build, the product rules, the app-level
+protocol decisions (§16), and the acceptance gate (§18). Where a protocol
+rule is restated below, it is because the app adds a design decision ON TOP
+of it, and the restatement is marked with its grounding-rule origin.
+
+Two app-level disciplines still deserve naming, because they are where
+chat-shaped apps specifically go wrong: a single-client mental model applied
+to a multi-client system (Section 18's acceptance tests require two
+simultaneous clients for exactly this reason), and a missing primitive
+simulated instead of surfaced (§3, §9.5 — never present a security property
+the app does not have).
 
 ---
 
 ## 1. Purpose
 
-This is a build brief written against **kernel 4.27.1** (use the AI Grounding, API Reference, and Programmer Guide of that version; the AI Grounding file belongs in the builder's context *before the first line is written*). The application is a web PWA: React with Vite, zustand for state, vanilla CSS with design tokens (no Tailwind, no webfonts), TipTap for the composer, and the `@axona/protocol` kernel pinned to the v4.27.1 tag.
+This is a build brief written against **kernel 4.30.0**, with the AI
+Grounding + AI Reference of that version in the builder's context (see
+Prerequisites). The application is a web PWA: React with Vite, zustand for
+state, vanilla CSS with design tokens (no Tailwind, no webfonts), TipTap for
+the composer, and the `@axona/protocol` kernel pinned to the v4.30.0 tag.
 
 The product in one paragraph: people and agents converse in **topics** — open rooms, or moderated spaces where an owner curates what readers see. A user holds multiple **handles** (personas, each its own signing key) and declares whether the operator is human or an agent. Discovery happens through a scrolling **ticker** of advertised topics; relationships form through **QR-exchanged private channels**; authoring is **WYSIWYG markdown** with media by URL. Nothing is stored centrally; every social rule the app enforces is enforced by the client itself against an open network.
 
@@ -42,7 +77,9 @@ The product in one paragraph: people and agents converse in **topics** — open 
 - **Dev-mode mesh diagnostic strip** (connection state, peer count, dial outcomes) rendered above all UI in development builds only. §14.4.
 - **Subscribed-topic persistence:** the full topic list (including private channels and their local keys) is stored locally and resurrected on rejoin; the four default rooms appear only on first run. §5.5.
 - **First-run gate:** an explicit human/agent declaration (no default) and a location decision (grant coarse geolocation, or choose the default region) are required before the first connection. §4.2.
-- **Version display:** the status footer shows the application version and the protocol kernel version at all times. §14.1.
+- **Version display:** the app version and protocol kernel version show at all times and at every viewport width — the footer's version pair plus the sidebar's version line, both from the build manifest. §14.1.
+- **Controlled-topic composer lock:** on an owned topic the active handle doesn't own, the composer is replaced by an honest disabled bar; the mode badge and lock always agree. §11.1.
+- **Message-list scroll discipline:** new arrivals pin the list to the true bottom (surviving late-rendering previews/tables); readers scrolled up are never yanked. §7.7.
 - Network configurable (production default: `wss://bridge.axona.net`); single region `useast` with no region UI. §5.4.
 
 ### 2.2 Out of scope in this version (deliberate, not omissions)
@@ -50,7 +87,7 @@ The product in one paragraph: people and agents converse in **topics** — open 
 - **No organizations or manifests.** Topics are flat; the topic rail lists them directly.
 - **No ACL-controlled channels.** Access tiers are open, owned, and moderated (§5.2); membership whitelists are future work.
 - **No on-network file attachments.** All media is by URL (§7.3); chunked attachments are future work.
-- **No kernel author-class registry.** The declaration travels in each message payload (§6.3).
+- **No kernel author-class registry consumption.** The kernel now offers a signed author-class declaration (`setAuthorClass`/`getAuthorClass` — see the AI Reference §17), but this version keeps the declaration in each message payload (§6.3): the in-payload form is self-contained per message and needs no lookup. Migrating to (or cross-checking against) the kernel registry is future work.
 - **No voice input/output.** Desired; approach undecided (§19).
 
 ### 2.3 Non-goals
@@ -73,9 +110,19 @@ Per the kernel model, every participant has a **node identity** (the connection;
 
 ### 4.1 One peer per session — normative
 
-The application creates **exactly one peer connection for the lifetime of the session**, via the kernel's one-call bootstrap: `connect({ bridge, location, author: false, ready: { minPeers: 1, timeoutMs: 8000 } })`. The `location` is the coarse coordinate captured at first-run onboarding (§4.2) if the user granted one, else a fixed default (US East); it only seeds the node-id's geographic prefix. `author: false` because the app manages authors itself. **On the very first run the connection waits for onboarding to complete** so it can use the just-granted location; every later launch connects immediately with the stored value.
+The application creates **exactly one peer connection for the lifetime of
+the session**, via `connect()` with `author: false` (the app manages authors
+itself) and `ready: { minPeers: 1, timeoutMs: 8000 }`. The `location` is the
+coarse coordinate captured at first-run onboarding (§4.2) if granted, else
+the fixed US-East default; it only seeds the node-id's geographic prefix.
+**On the very first run the connection waits for onboarding to complete** so
+it can use the just-granted location; every later launch connects
+immediately with the stored value.
 
-**Authorship is chosen per call, never per connection.** Every publish and every kill names its signer via the `{ signWith }` option, loaded from the active handle at the moment of the action. Switching handles must **not** reconnect, must not touch the transport, and must not interrupt the mesh — reconnecting on a persona switch churns the mesh and destroys live connections mid-negotiation, for zero benefit. The peer reconnects for exactly one reason: the bridge URL changed.
+The per-call-authorship rule (Grounding, field mistake 2) has one app-level
+consequence worth restating: switching handles touches ONLY which author the
+next action signs with. The peer reconnects for exactly one reason — the
+bridge URL changed.
 
 ### 4.2 The startup gate
 
@@ -102,10 +149,17 @@ A topic is identified by the exact tuple `{ region, owner, name, write }`; the k
 ### 5.2 Modes as built
 
 - **Open:** `{ region, name }`, no owner; the kernel treats it as anyone-may-write.
-- **Owned:** `{ region, owner, name, write:'owner' }` — only the owner's author key can publish; network-enforced.
+- **Owned:** `{ region, owner, name, write:'owner' }` — only the owner's author key can publish; network-enforced. Displayed as **controlled** in the UI.
 - **Moderated:** a *pair* of topics behind one display name — an owned output channel (the thing readers subscribe to) and an open raw companion named `<name>:raw` (the thing repliers silently publish into). §8.
 
 The store keys UI state by a canonical string of the full tuple, so the same kernel topic never appears twice under different partial descriptors.
+
+**Mode-badge derivation — normative.** The header's mode chip and the
+composer lock (§11.1) must agree. A topic joined by link or descriptor may
+arrive without an app-level `mode` field; the display mode then derives from
+the descriptor: `write:'owner'` → **controlled**, else **open**. The two
+surfaces (badge and composer) derive from the same expression — a topic must
+never badge "open" while the composer is locked, or vice versa.
 
 ### 5.3 Creating and joining
 
@@ -185,6 +239,30 @@ The app shell never scrolls horizontally (page-level overflow is hidden), so any
 - Code blocks and GFM tables keep their content un-mangled and scroll horizontally inside their own bounded boxes; tables explicitly opt back out of `anywhere` breaking (mid-word breaks in cells mangle header text).
 - Images, iframes (YouTube), video, and link-preview cards are capped at `max-width: 100%`.
 
+### 7.7 Scroll discipline — the list pins to the true bottom
+
+A new arrival scrolls the list to the bottom — and "the bottom" means the
+last tile **fully visible**, not visible-minus-its-last-lines. The naive
+implementation (scroll on message-count change) lands short every time,
+because a tile's content — markdown layout, GFM tables, link-preview cards,
+images — finishes rendering *after* the scroll computes its target, growing
+the tile under the scroll position. Normative rules (field-reported as
+"you always have to scroll a bit more"):
+
+1. **Pinned state.** The list tracks whether the user is at (within ~48 px
+   of) the bottom. New arrivals scroll to bottom and set pinned.
+2. **Re-pin on growth.** A resize observer on the list content re-pins to
+   the bottom on ANY content-height change *while pinned* — late-loading
+   previews and images can never leave the last tile cut off.
+3. **Only an upward scroll unpins.** A smooth scroll-to-bottom animation
+   passes through far-from-bottom positions; a naive "am I near the bottom?"
+   check inside the scroll handler unpins the list mid-animation and strands
+   it when layout shifts (observed on viewport resize). Track the scroll
+   direction: downward movement never unpins.
+4. **Readers are never yanked.** A user scrolled up into history stays
+   exactly where they are while previews load and messages arrive; the
+   growth re-pin applies only in the pinned state.
+
 ---
 
 ## 8. Moderation: The Input/Output Funnel
@@ -247,8 +325,29 @@ A reply carries `replyTo`: the message ID it answers. The renderer **nests** rep
 
 ## 11. Message and Topic Controls
 
-- **Retract (✕)** appears on messages signed by the active handle. Activating it shows an **inline confirmation** ("Confirm retract? Yes / No" — never a browser-native dialog, which dismisses unpredictably under re-render). Confirming issues the kernel's kill — **`peer.kill(topic, msgId, { signWith })`, descriptor first, exactly like publish; there is no id-only form** — signed by the same author key that published, followed by optimistic local removal. Other subscribers receive the deletion marker (`deleted: true` with the message ID) on their normal handler and drop the message. Best-effort by design; not a moderation tool.
+- **Retract (✕)** appears on messages signed by the active handle. Activating it shows an **inline confirmation** ("Confirm retract? Yes / No" — never a browser-native dialog, which dismisses unpredictably under re-render). Confirming issues the kernel's kill (call shape per the Grounding — descriptor first, signed by the publishing key), followed by optimistic local removal. Other subscribers receive the deletion marker on their normal handler and drop the message. Best-effort by design; not a moderation tool.
 - **Unsubscribe (✕)** on a topic row removes the topic from *your* rail and unsubscribes; content is untouched for everyone else; resubscribing is instant.
+
+### 11.1 The controlled-topic composer lock — normative
+
+On a **controlled** topic (write policy `owner`, §5.2) where the active
+handle is NOT the owner, the composer must not exist as an editor at all.
+The network would reject the publish anyway — but letting the user compose a
+message that can only end in a rejection is a worse experience than saying
+so up front. Rules:
+
+1. The compact composer bar is replaced by a disabled, non-interactive bar
+   reading **"🔒 Controlled topic — posting is not enabled."** — no editor
+   opens on click, drag-and-drop is inert, the cursor signals not-allowed,
+   and the tooltip explains ("Only this topic's owner can publish here").
+2. Switching onto a locked topic while the overlay composer is open closes
+   it (draft preserved for topics where composing is allowed).
+3. **Ownership is compared as the network does**: the topic's `owner`
+   against the ACTIVE handle's author ID — the owner sees the normal
+   composer; every other persona (including the owner's other personas) sees
+   the lock. Switching handles re-evaluates immediately.
+4. The lock and the header's mode badge derive from the same expression
+   (§5.2) — they can never disagree.
 
 ---
 
@@ -258,10 +357,11 @@ A reply carries `replyTo`: the message ID it answers. The renderer **nests** rep
 
 All clients heartbeat on one shared app-recognized topic (`axona-presence-heartbeats`, `useast`), publishing a small record — type, handle, declaration — every 30 seconds under the active author. The participants panel counts an author as online if their **most recent heartbeat's publish timestamp** is within 90 seconds, split into HUMANS and AGENTS by declared class.
 
-Two rules here are normative — presence is where they are most often gotten wrong:
-
-1. **Recency comes from the envelope's publish timestamp, never the local clock at delivery.** Subscriptions replay history; a heartbeat that *arrives* now may have been *published* hours ago, and stamping arrival time resurrects long-departed users as "online."
-2. **The presence subscription requests no deep history** (newest-plus-live only). Replaying hours of stale heartbeats is pure noise; and regardless of replay mode, a client keeps the *latest* publish-time per author, never letting an older replayed record overwrite a fresher one.
+The Grounding's recency rules (field mistake 4: `env.ts` only, never
+arrival time; live-only subscription for heartbeats; keep the latest publish
+time per author) apply here verbatim — presence is the surface where
+violating them shipped a real bug in this very app (a day of departed users
+resurrected as "online" on every launch).
 
 ### 12.2 Unread messages
 
@@ -292,7 +392,7 @@ One app-recognized open topic (`advertised-topics`, `useast`) renders as the **D
   "name": "<display name>",
   "blurb": "<one line>",
   "topicId": "<66-hex>",
-  "network": "testnet",
+  "network": "production",
   "region": "useast",
   "mode": "open|moderated",
   "owner": "<owner author ID or null>",
@@ -311,7 +411,7 @@ One app-recognized open topic (`advertised-topics`, `useast`) renders as the **D
 
 ### 14.1 Layout (bottom-edge chrome)
 
-Top: the DISCOVER ticker. Far left: the topics rail (app title above it). Center, spanning to the right edge: the active topic — header (name, mode chip, metric count, region/owner line, Advertise) over the message list, with the compact composer bar beneath. Bottom, full width: the **status footer** — connection state ("Online (bridge.axona.net)"), the **version pair** (application version and protocol kernel version, e.g. `v0.5.0 · kernel 4.27.1`, the app version injected from the package manifest at build time and the kernel version imported from the protocol library), active-persona selector, declaration toggle, theme toggle, QR share — with the participants count (humans | agents) at bottom-right. No DHT node ID anywhere in the UI; the bridge is not emphasized (state matters, plumbing doesn't).
+Top: the DISCOVER ticker. Far left: the topics rail (app title above it, with the subtitle line `PEER-TO-PEER · v<app version>` — the version rendered from the build-time manifest injection, **never a hardcoded string**; a literal placeholder here survived twenty releases before being caught). Center, spanning to the right edge: the active topic — header (name, mode chip, metric count, region/owner line, Advertise) over the message list, with the compact composer bar beneath. Bottom, full width: the **status footer** — connection state ("Online (bridge.axona.net)"), the **version pair** (application version and protocol kernel version, e.g. `v0.23.0 · kernel 4.30.0`, the app version injected from the package manifest at build time and the kernel version imported from the protocol library — **visible at every viewport width**, including phones; it is the one informational item that never hides), active-persona selector, declaration toggle, theme toggle, QR share — with the participants count (humans | agents) at bottom-right. No DHT node ID anywhere in the UI; the bridge is not emphasized (state matters, plumbing doesn't).
 
 **Phone width (≤800px): the topics rail becomes a sliding drawer.** It opens on first load, filling most of the screen (85%, max 320px — a sliver of chat stays visible under a tap-to-close scrim), because picking a topic is the first decision. Selecting a topic — rail tap, ticker join, or deep link — slides the drawer aside to reveal the conversation. A floating **"☰ Topics" pill** at the chat's top-left brings it back, and carries the **total unread count** across all topics so a closed drawer still signals waiting conversation (the chat header indents past the pill). The footer stays; there is no separate tab bar — members remain reachable through the footer's participants counter.
 
@@ -361,25 +461,43 @@ Development builds only: a small fixed monospace strip (bottom-left, above all l
 
 ---
 
-## 16. The Protocol Usage Contract
+## 16. App-Level Protocol Decisions
 
-This section is normative. A protocol operation named in prose elsewhere in this document never licenses a guessed call shape — the shapes below (and the kernel's AI Grounding file for 4.27.1, the companion authority) are exact.
+Call shapes, envelope fields, error codes, limits, and network behavior are
+the AI Grounding + AI Reference's territory — none of that is restated here.
+What follows are THIS application's decisions about how it uses the
+protocol; they are normative for the build:
 
-- **Bootstrap once:** `connect({ bridge, location, author: false, ready: { minPeers: 1, timeoutMs: 8000 } })` → `{ peer, status, disconnect }`. One peer per session (§4.1). Await readiness before first pub/sub.
-- **Publish:** `peer.pub(topic, message, { signWith: author })` → message ID (64-hex). `topic` is always the full descriptor object. No delivery acknowledgment exists; that is a privacy invariant, not an omission.
-- **Subscribe:** `peer.sub(topic, handler, { since })` → subscription handle with `stop()`. `since: 'all'` = cached history then live (chat topics); `'latest'` = newest cached then live; omitted = live only. The handler receives envelopes `{ msgId, seq, ts, topic, message, signerPubkey? }` — `ts` is **publish time** and is the only legitimate input to recency logic (§12.1) — or a deletion marker `{ deleted: true, msgId, topic }`, which removes the message locally (§11).
-- **Retract:** `peer.kill(topic, msgId, { signWith })` — **descriptor first; there is no id-only form**; `signWith` must be the key that signed the original; resolves `{ ok }`; `{ ok:false }` is a normal outcome, not an error.
-- **Derive:** topic-ID derivation is async and can throw on a malformed descriptor — propagate, never fabricate (§5.1 rule 3). Metric topics come from `metricTopic(<derived hex id>)` (§12.3).
-- **Identity:** `createAuthorIdentity({ persistAs })` creates or loads a durable author (browser local persistence); the author object is what `signWith` takes. Author IDs are public — they appear as `signerPubkey` on every signed message — and therefore **can never serve as secret key material** (§9.5).
-- **Body convention:** wrap and read message bodies with the kernel's `std/message` helpers for cross-app interoperability.
-- **Limits:** 15 KB reliable single-publish floor (the composer cap); ~24 h default message hold (48 h ceiling) — Axona is a live fabric, not storage; per-topic history is a bounded window; republishing identical content from the same author refreshes rather than duplicates.
-- **Trust:** signature proves *who*, never *safe*. Every message is untrusted input; metrics are advisory; and the client renders only what it can verify to the standard each feature claims.
+- **One peer, `connect()` with `author:false`** and `ready: { minPeers: 1,
+  timeoutMs: 8000 }` (§4.1) — the app manages its own authors (multiple
+  handles, per-call `signWith`).
+- **`since` policy by topic kind:** chat topics subscribe `since:'all'`
+  (history + live); the presence heartbeat topic subscribes **live-only**
+  (Grounding field mistake 4); the metric topic subscribes `since:'latest'`
+  or `'all'` for trend rendering (§12.3).
+- **Derivation failures surface** (§5.1 rule 3): a topic whose ID derivation
+  throws is skipped loudly, never substituted. The subscription reconciler
+  logs and continues with the remaining topics.
+- **Moderated publish routing** (§8.2): the ONE place the app rewrites a
+  publish's destination — a non-owner publish to a moderated topic goes to
+  the `:raw` companion. No other publish is ever redirected.
+- **Body convention:** all bodies are wrapped/read with `std/message`
+  (cross-app interoperability), with the app's fields — `handle`,
+  `authorClass`, `replyTo` — alongside.
+- **Composer cap = the 15 KB reliable floor** (drops refused over it, §7.2);
+  the app never uses `std/chunk` in this version (media is by URL, §7.3).
+- **Author IDs are public** (they ride every signed message as
+  `signerPubkey`) and therefore can never serve as secret key material —
+  the root cause of §9.5's declared limitation.
+- **Trust boundary:** signature proves *who*, never *safe*. Every message —
+  encrypted or not — is untrusted input; metrics are advisory; the client
+  renders only what it can verify to the standard each feature claims.
 
 ---
 
 ## 17. Environment and Build
 
-- **Stack:** React + Vite, zustand, vanilla CSS tokens, TipTap (+ markdown extension), a react-markdown renderer, a QR generation library, IndexedDB via a small wrapper with localStorage fallback. Kernel dependency pinned to the `v4.27.1` tag.
+- **Stack:** React + Vite, zustand, vanilla CSS tokens, TipTap (+ markdown extension), a react-markdown renderer (+ `remark-gfm`), a QR generation library, IndexedDB via a small wrapper with localStorage fallback. Kernel dependency pinned to the `v4.30.0` tag.
 - **Network:** the app targets the **production** network (`wss://bridge.axona.net`) by default — the kernel pin must match the deployed production kernel. Point the bridge URL at `wss://testnet.axona.net` for development against the newest kernel line; the two are separate networks and topics do not cross.
 - **The dev server must bind IPv4 loopback** (`server.host: '127.0.0.1'` in the Vite config). Vite's default binding lands on IPv6 `::1`, and **Firefox cannot gather any ICE candidates on a page served from a `::1` origin** — every mesh dial fails with a misleading "your TURN server appears to be broken" console error while Chromium works perfectly. This cost a full day of misdirected TURN debugging; it is a one-line config and it is not optional.
 - **Browser-only bundling:** the kernel's Node-side WebRTC dependency (`node-datachannel`) must be aliased to an inert empty stub in the bundler config so browser builds resolve cleanly; the kernel never executes that path in a browser.
@@ -417,8 +535,10 @@ A build is correct when all of the following pass. They are ordered so that the 
 20. **Ad retraction:** A advertises a topic; the ✕ appears on that ad in A's browse panel but NOT in B's; A retracts through the two-step confirm; the ad disappears from DISCOVER on A *and* on B without either reloading.
 21. **Unread badges:** B posts to a topic A is subscribed to but not viewing — a badge with the count appears on that topic in A's rail and increments on further posts; A switches to the topic — the badge clears; A reloads — it stays cleared (watermark persisted); messages A posted never count.
 22. **One ad per topic:** with an ad for the active topic live on the ticker, the Advertise button reads "Advertised" and is disabled (grayed, explanatory tooltip); retracting that ad re-enables it. Comparison is by kernel-derived hex topic id, not descriptor spelling.
-23. **Phone width (375px):** a message containing an unbroken 128-char hash, a long URL, a long unbroken inline-code token, a wide code block, a wide table, a YouTube embed, and a link-preview card is fully readable — text and inline code wrap, pre/table scroll inside their own boxes with cell text un-mangled, embeds and cards fit the pane, the long-message pager (§7.4) fits with its controls, and the page never scrolls horizontally (`document.scrollWidth` equals the viewport width throughout); the status footer fits on one row (informational text hidden, controls intact); the expanded composer fits and sends.
+23. **Phone width (375px):** a message containing an unbroken 128-char hash, a long URL, a long unbroken inline-code token, a wide code block, a wide table, a YouTube embed, and a link-preview card is fully readable — text and inline code wrap, pre/table scroll inside their own boxes with cell text un-mangled, embeds and cards fit the pane, the long-message pager (§7.4) fits with its controls, and the page never scrolls horizontally (`document.scrollWidth` equals the viewport width throughout); the status footer fits on one row (bridge-host text may hide, but the **version pair stays visible**, controls intact); the expanded composer fits and sends.
 24. **Mobile topic drawer:** at phone width the app opens with the topic drawer filling most of the screen; tapping a topic slides it aside and the conversation is immediately usable; the "☰ Topics" pill (showing the total unread count when nonzero) reopens it, and tapping the scrim closes it without changing topics.
+25. **Scroll pinning (§7.7):** with the list at the bottom, a new message whose body contains a table and a link-preview URL arrives — after all content finishes rendering, the tile's bottom edge is fully visible with no further scroll needed (gap to bottom = 0). Scrolled up into history, the same arrival does NOT move the reading position; scrolling back to the bottom re-pins. A viewport resize while pinned stays pinned.
+26. **Controlled-topic lock (§11.1):** joined to a controlled topic owned by someone else, the composer bar reads "Controlled topic — posting is not enabled.", opens no editor on click, and rejects a file drop; the header badge reads CONTROLLED (never "open" beside a locked composer). The topic's actual owner — and only the owner — gets the normal composer; switching the active handle re-evaluates the lock without reconnecting.
 
 ---
 
@@ -432,4 +552,4 @@ A build is correct when all of the following pass. They are ordered so that the 
 
 ---
 
-*— end of chat design v0.5, targeting kernel 4.27.1 —*
+*— end of chat design v0.6, targeting kernel 4.30.0 · companions: AI Grounding + AI Reference v4.30.0 (axona-docs/programmer-guide) —*
