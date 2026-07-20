@@ -4,6 +4,8 @@ import remarkGfm from 'remark-gfm';
 import { useChatStore } from '../stores/useChatStore.js';
 import AxonaChatClient from '../services/AxonaChatClient.js';
 import LinkPreview from './LinkPreview.jsx';
+import TopicLinkChip from './TopicLinkChip.jsx';
+import { isTopicLink } from '../services/topicLink.js';
 
 // Long-message panel height: comfortably smaller than the viewport so a
 // single message can never dominate the list. Pages advance by slightly
@@ -103,7 +105,8 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
     const previewUrls = [...new Set(allUrls.filter(url => {
       const isImg = /\.(?:png|jpg|jpeg|gif|webp|svg)/i.test(url);
       const isYt = /(?:youtube\.com\/watch\?v=|youtu\.be\/)/i.test(url);
-      return !isImg && !isYt;
+      // Topic links render as their own chip (and would 404 a link-preview fetch).
+      return !isImg && !isYt && !isTopicLink(url);
     }))];
 
     return (
@@ -217,11 +220,14 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
             // markdown document must render whole, not a subset (§7.2).
             remarkPlugins={[remarkGfm]}
             components={{
-              a: ({ href, children }) => (
-                <a href={href} target="_blank" rel="noopener noreferrer">
-                  {children}
-                </a>
-              ),
+              a: ({ href, children }) =>
+                isTopicLink(href) ? (
+                  <TopicLinkChip href={href}>{children}</TopicLinkChip>
+                ) : (
+                  <a href={href} target="_blank" rel="noopener noreferrer">
+                    {children}
+                  </a>
+                ),
               // Wide tables scroll inside their own container instead of
               // stretching the message pane.
               table: ({ children }) => (

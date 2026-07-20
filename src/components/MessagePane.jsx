@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useChatStore } from '../stores/useChatStore.js';
 import Message from './Message.jsx';
 import AxonaChatClient from '../services/AxonaChatClient.js';
+import { buildTopicLink } from '../services/topicLink.js';
 
 const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => {
   const { activeTopic, activeTopicId, messages, currentHandle, moderationQueue, topicMetrics } = useChatStore();
@@ -29,6 +30,7 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  const [copied, setCopied] = useState(false);
   const [activeHexId, setActiveHexId] = useState(null);
   useEffect(() => {
     let stale = false;
@@ -201,6 +203,37 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
 
         {/* Header Controls */}
         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          {/* Copy topic link — a shareable URL that opens this topic, and pastes
+              into any message as a topic-link chip. */}
+          {activeTopic.name !== 'advertised-topics' && (
+            <button
+              onClick={() => {
+                const link = buildTopicLink({
+                  region: activeTopic.region,
+                  name: activeTopic.name,
+                  owner: activeTopic.owner,
+                  write: activeTopic.write || (activeTopic.owner ? 'owner' : 'open'),
+                  label: activeTopic.name,
+                });
+                const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1600); };
+                if (navigator.clipboard?.writeText) navigator.clipboard.writeText(link).then(done).catch(done);
+                else { window.prompt('Copy this topic link:', link); }
+              }}
+              title="Copy a shareable link to this topic — paste it into any conversation (it becomes a clickable topic chip) or share it anywhere; opening it launches the app on this topic"
+              style={{
+                fontSize: '0.75rem',
+                padding: '0.3rem 0.6rem',
+                background: copied ? 'var(--color-success-bg)' : 'var(--color-bg)',
+                border: '1px solid var(--border-color)',
+                color: copied ? 'var(--color-success)' : 'var(--color-text)',
+                cursor: 'pointer',
+                borderRadius: '4px'
+              }}
+            >
+              🔗 {copied ? 'Copied!' : 'Copy link'}
+            </button>
+          )}
+
           {/* Advertise Button (not on the ticker itself) */}
           {activeTopic.name !== 'advertised-topics' && (
             <button
