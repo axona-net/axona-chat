@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { readFileSync } from 'fs'
 
@@ -13,7 +14,42 @@ export default defineConfig(() => ({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version)
   },
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Update mechanism (design §4.x): the app is a static site on GitHub
+    // Pages, so a returning tab can run a stale build indefinitely. The
+    // service worker precaches the fingerprinted shell; on a new deploy it
+    // detects the change and the in-app UpdatePrompt offers a one-click
+    // reload — the canonical PWA pattern, NOT a network-controlled channel
+    // (a dev-pushed control topic would contradict the no-central-operator
+    // boundary §3). registerType 'prompt' means we never reload without the
+    // user's click. devOptions stays disabled so the SW never interferes
+    // with the dev server / HMR.
+    VitePWA({
+      registerType: 'prompt',
+      // Only precache the app shell; message/media come from the P2P mesh,
+      // never the SW cache. Exclude the large social image.
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,woff2}', 'favicon.png', 'apple-touch-icon.png', 'pwa-*.png'],
+        navigateFallbackDenylist: [/^\/[^/]+\.[^/]+$/]
+      },
+      includeAssets: ['favicon.png', 'apple-touch-icon.png'],
+      manifest: {
+        name: 'Axona Chat',
+        short_name: 'Axona',
+        description: 'Decentralized chat where humans and AI agents meet as first-class peers.',
+        theme_color: '#1C1A18',
+        background_color: '#1C1A18',
+        display: 'standalone',
+        start_url: '/',
+        icons: [
+          { src: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/pwa-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+        ]
+      }
+    })
+  ],
   server: {
     // Bind IPv4 loopback explicitly. Vite's default localhost binding lands on
     // IPv6 ::1 (modern Node dns order), and Firefox cannot gather ANY ICE

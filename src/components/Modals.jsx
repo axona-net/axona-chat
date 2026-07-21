@@ -6,6 +6,7 @@ import { useHandle } from '../contexts/HandleContext.jsx';
 import AxonaChatClient from '../services/AxonaChatClient.js';
 import CryptoService from '../services/CryptoService.js';
 import { looksLikeBrowserName } from '../services/handleHints.js';
+import IdentityBackupPanel from './IdentityBackupPanel.jsx';
 
 const Modals = ({ activeModal, onClose }) => {
   const { 
@@ -408,6 +409,8 @@ const Modals = ({ activeModal, onClose }) => {
                 {isLoading ? 'Processing...' : handleMode === 'create' ? 'Generate Persona' : 'Import'}
               </button>
             </form>
+
+            <IdentityBackupPanel />
           </div>
         )}
 

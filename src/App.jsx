@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import ChatShell from './components/ChatShell.jsx';
 import OnboardingGate from './components/OnboardingGate.jsx';
+import UpdatePrompt from './components/UpdatePrompt.jsx';
 import { useChatStore } from './stores/useChatStore.js';
 import { readTopicFromLocation, clearTopicFromLocation } from './services/topicLink.js';
 
@@ -35,6 +36,7 @@ function App() {
       <OnboardingGate>
         <ChatShell />
       </OnboardingGate>
+      <UpdatePrompt />
     </div>
   );
 }

@@ -8,37 +8,66 @@ import TopicLinkChip from './TopicLinkChip.jsx';
 import { isTopicLink } from '../services/topicLink.js';
 
 // Long-message panel height: comfortably smaller than the viewport so a
-// single message can never dominate the list. Pages advance by slightly
-// less than the panel height so a line clipped at one page's bottom edge
-// reappears whole at the top of the next.
+// single message can never dominate the list.
 const PAGE_H = Math.min(360, Math.round(window.innerHeight * 0.45));
-const PAGE_STEP = PAGE_H - 28;
+// A message only a little over the panel height isn't worth paging.
+const PAGE_TOL = 60;
 
 const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) => {
   const { msgId, signerPubkey, ts } = envelope;
   const payload = envelope.message;
   const { currentHandle } = useChatStore();
   const [showConfirm, setShowConfirm] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Long-message paging: content taller than PAGE_H renders inside a
   // fixed-height panel stepped with Previous/Next — deliberately NOT an
   // inner scrollbar, which would fight the message list's own scrolling.
+  //
+  // Pages break ONLY at block boundaries (paragraphs, headings, list items,
+  // tables), never on a fixed pixel step. A blind step used to slice through
+  // whatever line straddled the panel edge and only restore it if it was
+  // shorter than a fixed overlap — so headings, list items, and table rows
+  // (taller than that overlap) stayed clipped and unreadable. Snapping to the
+  // top of the first block that would overflow guarantees no page ever cuts a
+  // block in half. pageOffsets[i] is the translateY (in px) for page i.
   const contentRef = useRef(null);
-  const [pageCount, setPageCount] = useState(1);
+  const [pageOffsets, setPageOffsets] = useState([0]);
   const [page, setPage] = useState(0);
+  const pageCount = pageOffsets.length;
   useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
+    const content = contentRef.current;
+    if (!content) return;
     const measure = () => {
-      const h = el.scrollHeight;
-      // Small tolerance so a message barely over the limit isn't paged.
-      const pages = h > PAGE_H + 60 ? 1 + Math.ceil((h - PAGE_H) / PAGE_STEP) : 1;
-      setPageCount(pages);
-      setPage(p => Math.min(p, pages - 1));
+      if (content.scrollHeight <= PAGE_H + PAGE_TOL) {
+        setPageOffsets([0]);
+        setPage(0);
+        return;
+      }
+      // The block list is the content's direct children (markdown blocks plus
+      // the trailing embeds container). If markdown ever renders under a single
+      // wrapper, descend one level so we still break on real blocks.
+      let blocks = Array.from(content.children);
+      if (blocks.length <= 1 && blocks[0]) blocks = Array.from(blocks[0].children);
+      const offsets = [0];
+      let start = 0;
+      for (const b of blocks) {
+        const top = b.offsetTop;
+        const bottom = top + b.offsetHeight;
+        // This block spills past the current page and doesn't itself begin it:
+        // start a fresh page at its top. (A lone block taller than the panel
+        // still gets its own page — unavoidable, and rare: a huge code block.)
+        if (bottom - start > PAGE_H && top > start) {
+          start = top;
+          offsets.push(start);
+        }
+      }
+      setPageOffsets(offsets);
+      setPage(p => Math.min(p, offsets.length - 1));
     };
     measure();
     const ro = new ResizeObserver(measure);   // re-measure as embeds load
-    ro.observe(el);
+    ro.observe(content);
     return () => ro.disconnect();
   }, []);
 
@@ -142,6 +171,19 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
 
   const displayText = payload.isEncrypted ? payload.decryptedText : payload.md || payload.text || '';
 
+  // Copy the WHOLE message source — especially useful for long/paged messages,
+  // where the reader can only ever see one page at a time.
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(displayText || '');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked (insecure context / permissions) — leave it silent;
+      // the text is still on screen.
+    }
+  };
+
   return (
     <div style={{
       display: 'flex',
@@ -210,8 +252,11 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
           ref={contentRef}
           className="message-content"
           style={{
+            // position:relative makes this the offsetParent, so each block's
+            // offsetTop (used for page boundaries above) is measured from here.
+            position: 'relative',
             fontSize: '0.9rem', lineHeight: '1.4', wordBreak: 'break-word', color: 'var(--color-text)',
-            transform: pageCount > 1 ? `translateY(-${page * PAGE_STEP}px)` : undefined,
+            transform: pageCount > 1 ? `translateY(-${pageOffsets[page] || 0}px)` : undefined,
             transition: 'transform 0.2s ease'
           }}
         >
@@ -275,6 +320,16 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
 
       {/* Action Footer */}
       <div style={{ display: 'flex', gap: '1rem', marginTop: '0.2rem', justifyContent: 'flex-end', fontSize: '0.7rem' }}>
+        <span
+          onClick={handleCopy}
+          title="Copy the full message text — grabs the whole message, not just the visible page"
+          style={{ color: copied ? 'var(--color-success)' : 'var(--color-muted)', cursor: 'pointer', transition: 'color 0.2s' }}
+          onMouseEnter={(e) => { if (!copied) e.target.style.color = 'var(--color-primary)'; }}
+          onMouseLeave={(e) => { if (!copied) e.target.style.color = 'var(--color-muted)'; }}
+        >
+          {copied ? 'Copied ✓' : 'Copy'}
+        </span>
+
         <span
           onClick={() => onReply(envelope)}
           title="Reply publicly — your reply appears nested under this message"

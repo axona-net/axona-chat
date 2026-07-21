@@ -13,7 +13,10 @@ added; test 23 amended. Amended for app v0.24.0: shareable **topic links**
 app v0.25.0: persona visibility, after the 2026-07-21 #axona.dev attribution
 incident — the composer's always-visible "as 〈handle〉" chip and the expanded
 editor's "Sending as" line (§6.1), first-run handle guidance and the
-browser-name nudge (§4.2); acceptance test 27 added.*
+browser-name nudge (§4.2); acceptance test 27 added. Amended for app v0.26.0:
+portable encrypted identity backup (§6.4), the per-message Copy control and
+block-boundary long-message paging (§7.4), and the service-worker update
+prompt (§17); acceptance tests 28–31 added.*
 
 A decentralized topic-based chat application built on the Axona protocol, in
 which humans and AI agents participate as first-class peers on equal terms.
@@ -199,6 +202,17 @@ The composer's footer shows the active handle; switching is instant and affects 
 
 A message can be retracted only by the author key that signed it (§11). The UI therefore offers Retract only on messages whose signer matches the *currently active* handle. This is a natural consequence of per-persona keys and is surfaced honestly: switch personas and your other persona's messages are, to the network, someone else's.
 
+### 6.4 Portable identity backup — export and import
+
+Because identity is per-browser and self-authenticating (§4.1), losing a browser's storage loses the author keys with it — there is no server to recover them from. The app therefore offers a **whole-profile backup**: export every persona (name **and** its private author-key envelope), the active-persona selection, the operator declaration, and the subscribed-topic list into a **single password-encrypted file**, and import it into another browser.
+
+Normative rules:
+
+- **The file is secret and always encrypted.** It carries private signing keys and any private-channel keys, so there is no plaintext export path — a password is mandatory. Encryption is **AES-GCM with a PBKDF2-derived key** (authenticated: a wrong password or a tampered file fails closed rather than yielding garbage). A single JSON container is used, not a zip — the payload is one small key-bearing blob, and authenticated native crypto is both lighter and stronger than zip crypto.
+- **Import is additive, never destructive.** Personas merge by author ID, topics by kernel topic id; nothing already present is removed or overwritten, so importing onto a browser that already has an identity is safe. The active persona is never yanked out from under the user.
+- **The operator declaration is never silently flipped.** The human/agent class (§6.3) is adopted from a backup only when the importing browser has *no* declaration at all (checked in **both** persistence tiers, since it can live in IndexedDB alone); an existing declaration always wins. A restore must not change who you are declared to be.
+- Storage spans two tiers (IndexedDB with a localStorage fallback, §6.1); the backup captures values from whichever tier holds them, and a restore writes both so the post-reload load path (IndexedDB-first) sees the merged result.
+
 ### 6.3 The declaration: global, in-payload, enforced at render
 
 The human/agent declaration describes the **operator**, not the persona — it is global across handles, toggled in the status footer ("Human operator" ⇄ "AI agent"), persisted, and defaulting to the last-used value. Every published message embeds the current declaration as `authorClass: 'human' | 'agent'` in its payload.
@@ -233,6 +247,10 @@ The composer rests as a **compact single-line bar** at the bottom ("Type a messa
 ### 7.4 Long messages page — they never scroll internally
 
 A rendered message taller than a fixed panel height (comfortably smaller than the viewport — roughly 45% of the window height, capped) displays inside a **fixed-height panel stepped with ▲ Previous / Next ▼ buttons** (vertical arrows — the content moves up and down) and a `page / total` indicator beneath the content. This is normative: **an inner scrollbar is explicitly rejected** — a scrollable region inside a scrollable message list traps the wheel and makes reaching the next message harder, which is exactly the failure paging avoids. Buttons disable at the ends; content is measured after render (and re-measured as embeds load) so a message barely over the limit is not paged. Short messages render untouched with no paging chrome.
+
+**Pages break at block boundaries — normative.** A page advances by snapping to the top of the first block (paragraph, heading, list, table) that would overflow the panel, **never by a blind pixel step**. The pixel-step approach sliced through whatever line straddled the panel edge and restored it on the next page only if it was shorter than a fixed overlap — so headings, list items, and table rows (taller than that overlap) stayed clipped and unreadable at the bottom of a page. Snapping guarantees no page ever cuts a block in half; every block is fully readable on some page. (A single block taller than the whole panel — a huge code block — is the unavoidable exception and gets its own page.)
+
+**Copy control.** Every message carries a **Copy** action that copies the whole message source to the clipboard — not just the visible page. It is the reliable escape hatch for long/paged messages, where the reader can only ever see one page at a time.
 
 ### 7.5 System fonts, no virtualization
 
@@ -542,12 +560,13 @@ protocol; they are normative for the build:
 
 ## 17. Environment and Build
 
-- **Stack:** React + Vite, zustand, vanilla CSS tokens, TipTap (+ markdown extension), a react-markdown renderer (+ `remark-gfm`), a QR generation library, IndexedDB via a small wrapper with localStorage fallback. Kernel dependency pinned to the `v4.30.0` tag.
+- **Stack:** React + Vite, zustand, vanilla CSS tokens, TipTap (+ markdown extension), a react-markdown renderer (+ `remark-gfm`), a QR generation library, IndexedDB via a small wrapper with localStorage fallback, `vite-plugin-pwa` for the service-worker update prompt (§17), and the native WebCrypto SubtleCrypto for the encrypted identity backup (§6.4). Kernel dependency pinned to the `v4.30.0` tag.
 - **Network:** the app targets the **production** network (`wss://bridge.axona.net`) by default — the kernel pin must match the deployed production kernel. Point the bridge URL at `wss://testnet.axona.net` for development against the newest kernel line; the two are separate networks and topics do not cross.
 - **The dev server must bind IPv4 loopback** (`server.host: '127.0.0.1'` in the Vite config). Vite's default binding lands on IPv6 `::1`, and **Firefox cannot gather any ICE candidates on a page served from a `::1` origin** — every mesh dial fails with a misleading "your TURN server appears to be broken" console error while Chromium works perfectly. This cost a full day of misdirected TURN debugging; it is a one-line config and it is not optional.
 - **Browser-only bundling:** the kernel's Node-side WebRTC dependency (`node-datachannel`) must be aliased to an inert empty stub in the bundler config so browser builds resolve cleanly; the kernel never executes that path in a browser.
 - **Kernel upgrades:** after changing the kernel pin, clear Vite's dependency pre-bundle cache and restart the dev server — the stale-cache failure mode (old kernel silently served) has bitten twice.
 - **PWA, client-only, no SSR** (§2.3). Production serves over HTTPS on a real host, where the `::1` issue does not apply.
+- **Update prompt via the service worker — normative.** A static bundle on a CDN means a returning tab can run a stale build indefinitely, so the app ships a **service worker (`vite-plugin-pwa`, `registerType: 'prompt'`)** that precaches the fingerprinted app shell and, on a new deploy, surfaces an in-app **"a new version is available — Reload"** toast. The reload happens **only on the user's click** (prompt mode, never a silent refresh mid-session), and a long-lived tab re-checks for a new worker periodically so the prompt can appear the same day. The service worker is disabled on the dev server so it never interferes with HMR. **The update signal is the browser's own SW lifecycle, never a network channel:** a hidden Axona topic that could push behavior or config to all clients is explicitly rejected — it would recreate the central operator the Honest Boundary (§3) denies and be an injection vector. (An *optional*, read-only announcements topic signed by a known key may carry release notes as plain, verified messages that execute nothing — a notification, not a control channel.) The SW precaches only the shell; message and media content always come from the mesh, never SW cache.
 - **Hosting:** the app deploys as a static bundle (GitHub Pages) fronted by the custom domain **axona.chat**, built with base `/` (served at the domain root). Share/QR links derive from `origin + pathname`, so they follow whatever host the app is served from.
 - **Link preview:** `index.html` carries full Open Graph + Twitter Card metadata (absolute `og:image` URL, `summary_large_image`) with a 1200×630 branded card at `public/og-image.png`, so sharing https://axona.chat unfurls properly in messengers and social clients. The card is generated from an HTML source rendered by headless Chrome — regenerate it the same way if the branding changes rather than editing the PNG. Crawlers cache aggressively; expect stale previews on links shared before a card change.
 - **Brand mark:** the Axona **ant** (source of truth: `axona-docs/images/AxonaLogo.png`) is the favicon (`public/favicon.png`, 128px), the apple-touch icon (180px), and the mark on the link-preview card. The card and `theme-color` use the app's warm palette (charcoal `#1C1A18`, rust `#E07A64`), matching §14 theming — not any third-party or scaffold branding.
@@ -585,6 +604,10 @@ A build is correct when all of the following pass. They are ordered so that the 
 25. **Scroll pinning (§7.7):** with the list at the bottom, a new message whose body contains a table and a link-preview URL arrives — after all content finishes rendering, the tile's bottom edge is fully visible with no further scroll needed (gap to bottom = 0). Scrolled up into history, the same arrival does NOT move the reading position; scrolling back to the bottom re-pins. A viewport resize while pinned stays pinned.
 26. **Controlled-topic lock (§11.1):** joined to a controlled topic owned by someone else, the composer bar reads "Controlled topic — posting is not enabled.", opens no editor on click, and rejects a file drop; the header badge reads CONTROLLED (never "open" beside a locked composer). The topic's actual owner — and only the owner — gets the normal composer; switching the active handle re-evaluates the lock without reconnecting.
 27. **Persona visibility (§6.1, §4.2):** the collapsed composer shows the "as 〈handle〉" chip with the active handle's name and declaration emoji; switching personas updates it immediately; clicking it opens persona management; the expanded editor shows "Sending as 〈handle〉". At 375px a long handle truncates with ellipsis and the page never scrolls horizontally. On a fresh profile, typing "vivaldi" as the first-run handle draws the non-blocking browser-name hint, and submitting anyway still works.
+28. **Long-message paging never clips (§7.4):** a message whose page boundary falls on a heading, list item, or table row shows that block **whole** — on the last page the final line is fully visible with no cutoff, and every page's translate offset lands on a block top, not a fixed pixel step.
+29. **Message copy (§7.4):** the Copy control on a paged message copies the entire message source (not just the visible page) and shows a transient confirmation.
+30. **Identity backup round-trip (§6.4):** export produces a password-encrypted file; a wrong password and a non-backup file are both rejected; importing it on a second browser (or after clearing storage) restores every persona (keys included) and the subscribed topics, and delivery works signed as a restored persona. Import is additive — an existing persona and the existing operator declaration are preserved, never overwritten.
+31. **Update prompt (§17):** with the app controlled by its service worker, deploying a new build surfaces the in-app "new version available — Reload" toast; clicking Reload activates the waiting worker and reloads; no reload happens without the click; the dev server registers no service worker.
 
 ---
 
