@@ -5,6 +5,7 @@ import { useChatStore } from '../stores/useChatStore.js';
 import { useHandle } from '../contexts/HandleContext.jsx';
 import AxonaChatClient from '../services/AxonaChatClient.js';
 import CryptoService from '../services/CryptoService.js';
+import { looksLikeBrowserName } from '../services/handleHints.js';
 
 const Modals = ({ activeModal, onClose }) => {
   const { 
@@ -379,6 +380,12 @@ const Modals = ({ activeModal, onClose }) => {
                   style={inputStyle}
                   required
                 />
+                {looksLikeBrowserName(handleName) && (
+                  <div style={{ fontSize: '0.72rem', color: '#f1c40f', marginTop: '0.25rem' }}>
+                    ⚠ “{handleName.trim()}” looks like a browser name. Others will see it as <i>you</i>,
+                    not this browser — consider the name you actually go by.
+                  </div>
+                )}
               </div>
 
               {handleMode === 'import' && (

@@ -221,6 +221,7 @@ const ChatShell = () => {
             replyTarget={replyTarget}
             privateReplyTarget={privateReplyTarget}
             clearReplyTargets={clearReplyTargets}
+            onOpenModal={handleOpenModal}
           />
         </div>
 

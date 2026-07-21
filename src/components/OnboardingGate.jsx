@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHandle } from '../contexts/HandleContext.jsx';
+import { looksLikeBrowserName } from '../services/handleHints.js';
 
 // Marks first-run setup complete and lets the peer layer know it may
 // connect (first-run connection waits so it can use the granted location).
@@ -146,6 +147,15 @@ const OnboardingGate = ({ children }) => {
                   outline: 'none'
                 }}
               />
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-muted)', marginTop: '0.3rem' }}>
+                This is your public name — shown on every message you post from this browser.
+              </div>
+              {looksLikeBrowserName(handleName) && (
+                <div style={{ fontSize: '0.72rem', color: '#f1c40f', marginTop: '0.25rem' }}>
+                  ⚠ “{handleName.trim()}” looks like a browser name. Others will see it as <i>you</i>,
+                  not this browser — consider the name you actually go by.
+                </div>
+              )}
             </div>
 
             {mode === 'import' && (

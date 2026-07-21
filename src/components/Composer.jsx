@@ -30,7 +30,7 @@ const ToolbarButton = ({ onClick, label, active = false }) => (
   </button>
 );
 
-const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
+const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenModal }) => {
   const { activeTopic } = useChatStore();
   const { declaration, activeHandle } = useHandle();
 
@@ -272,34 +272,78 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
           </div>
         )}
 
-        <div
-          onClick={ownerLocked ? undefined : () => setIsExpanded(true)}
-          onDragOver={ownerLocked ? undefined : handleDragOver}
-          onDrop={ownerLocked ? undefined : handleFileDrop}
-          title={ownerLocked ? 'Only this topic’s owner can publish here' : undefined}
-          style={{
-            padding: '0.55rem 0.8rem',
-            background: 'var(--color-surface)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius)',
-            cursor: ownerLocked ? 'not-allowed' : 'pointer',
-            opacity: ownerLocked ? 0.75 : 1,
-            minHeight: '38px',
-            display: 'flex',
-            alignItems: 'center',
-            color: 'var(--color-muted)',
-            fontSize: '0.85rem',
-            transition: 'border-color 0.2s'
-          }}
-          onMouseEnter={ownerLocked ? undefined : (e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
-          onMouseLeave={ownerLocked ? undefined : (e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
-        >
-          {ownerLocked
-            ? <span>🔒 Controlled topic — posting is not enabled.</span>
-            : editor && editor.getText().trim()
-              ? <span style={{ color: 'var(--color-text)' }}>{editor.getText().slice(0, 100)}...</span>
-              : <span>Type a message... (Click to open markdown formatting composer)</span>
-          }
+        {/* Fake input + "posting as" chip in one row. The chip is the
+            you-appear-as-X-in-this-browser indicator: per-browser identity is
+            by design, so a stale handle in one browser must be noticed where
+            the user is about to post, not discovered later on the wire. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+          <div
+            onClick={ownerLocked ? undefined : () => setIsExpanded(true)}
+            onDragOver={ownerLocked ? undefined : handleDragOver}
+            onDrop={ownerLocked ? undefined : handleFileDrop}
+            title={ownerLocked ? 'Only this topic’s owner can publish here' : undefined}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: '0.55rem 0.8rem',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius)',
+              cursor: ownerLocked ? 'not-allowed' : 'pointer',
+              opacity: ownerLocked ? 0.75 : 1,
+              minHeight: '38px',
+              display: 'flex',
+              alignItems: 'center',
+              color: 'var(--color-muted)',
+              fontSize: '0.85rem',
+              transition: 'border-color 0.2s',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis'
+            }}
+            onMouseEnter={ownerLocked ? undefined : (e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
+            onMouseLeave={ownerLocked ? undefined : (e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
+          >
+            {ownerLocked
+              ? <span>🔒 Controlled topic — posting is not enabled.</span>
+              : editor && editor.getText().trim()
+                ? <span style={{ color: 'var(--color-text)' }}>{editor.getText().slice(0, 100)}...</span>
+                : <span>Type a message... (Click to open markdown formatting composer)</span>
+            }
+          </div>
+          {!ownerLocked && activeHandle && (
+            <button
+              onClick={() => onOpenModal?.('handles')}
+              title={`You appear as “${activeHandle.name}” in this browser — every message you send here is signed and shown under this name. Click to switch or manage personas.`}
+              style={{
+                flexShrink: 1,
+                minWidth: 0,
+                maxWidth: '38%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                padding: '0.35rem 0.7rem',
+                fontSize: '0.75rem',
+                background: 'var(--color-bg)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '999px',
+                cursor: 'pointer',
+                color: 'var(--color-muted)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden'
+              }}
+            >
+              as {declaration === 'agent' ? '🤖' : '🙋'}
+              <span style={{
+                fontWeight: '700',
+                color: 'var(--color-text)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {activeHandle.name}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -493,10 +537,18 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets }) => {
 
             {/* Bottom Actions Bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.6rem' }}>
-              <span style={{ fontSize: '0.72rem', color: 'var(--color-muted)' }}>
-                Tip: Press <b>Ctrl + Enter</b> to send | Max size: 15 KB
-              </span>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                <span
+                  title="Every message you send here is signed and shown under this persona"
+                  style={{ fontSize: '0.72rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                >
+                  Sending as {declaration === 'agent' ? '🤖' : '🙋'} <b style={{ color: 'var(--color-text)' }}>{activeHandle?.name || '(no persona)'}</b>
+                </span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-muted)' }}>
+                  Tip: Press <b>Ctrl + Enter</b> to send | Max size: 15 KB
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
                 <button
                   onClick={() => setIsExpanded(false)}
                   title="Close the editor without sending — your draft is kept and reopens where you left off"
