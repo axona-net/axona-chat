@@ -22,6 +22,8 @@ class AxonaChatClient {
     this.presenceInterval = null;
     this.heartbeatTopic = { region: 'useast', name: 'axona-presence-heartbeats' };
     this.tickerTopic = { region: 'useast', name: 'advertised-topics' };
+    this._authorClassInflight = new Set(); // signers with a getAuthorClass pull in flight
+    this._declaredKey = null;              // `${authorId}:${class}` last published, to avoid re-declaring
   }
 
   setPeer(peer) {
@@ -49,6 +51,51 @@ class AxonaChatClient {
   // diverge this client's bookkeeping from every other peer on the topic).
   async getTopicHexId(descriptor) {
     return await deriveTopicId(descriptor);
+  }
+
+  // Resolve a sender's VERIFIED author-class from its Author ID (signerPubkey),
+  // the interoperable kernel mechanism — a signed attestation on the author's
+  // owner-only profile topic, pulled + verified by peer.getAuthorClass(). This is
+  // the source of truth for the HUMAN/AGENT badge, NOT the spoofable in-body
+  // `authorClass` string any publisher could type. Cached per signer in the store
+  // (one pull per author per session); result is fire-and-forget — the badge
+  // paints when it lands. Absence/failure resolves to 'unstated' (unbadged, shown).
+  async resolveAuthorClass(signer) {
+    if (!this.peer || !signer || typeof signer !== 'string' || signer.length !== 64) return;
+    const store = useChatStore.getState();
+    if (store.authorClasses[signer] || this._authorClassInflight.has(signer)) return;
+    this._authorClassInflight.add(signer);
+    store.setAuthorClassResolved(signer, { class: 'pending' });
+    try {
+      const info = await this.peer.getAuthorClass(signer, { timeoutMs: 4000 });
+      useChatStore.getState().setAuthorClassResolved(signer, info || { class: 'unstated' });
+    } catch {
+      useChatStore.getState().setAuthorClassResolved(signer, { class: 'unstated' });
+    } finally {
+      this._authorClassInflight.delete(signer);
+    }
+  }
+
+  // Publish OUR author-class as a signed attestation so any app (Axona Minimal,
+  // other chat clients) can resolve it via getAuthorClass — the symmetric half of
+  // resolveAuthorClass. Only 'human'/'agent' are declarable here; 'unstated' means
+  // "don't declare" (the kernel treats absence as unstated — never a default).
+  // Idempotent: re-declares only when the active author or class actually changes.
+  async declareAuthorClass() {
+    if (!this.peer) return;
+    const store = useChatStore.getState();
+    const handle = store.currentHandle;
+    const cls = store.currentDeclaration;
+    if (!handle || (cls !== 'human' && cls !== 'agent')) return;
+    const key = `${handle.authorId}:${cls}`;
+    if (this._declaredKey === key) return;
+    try {
+      const author = await this.getActiveAuthor();
+      await this.peer.setAuthorClass(cls, { signWith: author });
+      this._declaredKey = key;
+    } catch (e) {
+      console.warn('declareAuthorClass failed (will retry on next change):', e?.message || e);
+    }
   }
 
   /**
@@ -195,6 +242,7 @@ class AxonaChatClient {
             const decrypted = CryptoService.decryptAsRecipient(processedPayload.ciphertext, currentHandle.authorId);
             if (decrypted) {
               const reply = JSON.parse(decrypted);
+              this.resolveAuthorClass(senderId);
               // Store as decrypted message
               useChatStore.getState().addEnvelope(getTopicId(descriptor), {
                 ...envelope,
@@ -233,7 +281,10 @@ class AxonaChatClient {
           return;
         }
 
-        // Normal delivery
+        // Normal delivery. Kick off (cached) resolution of the sender's signed
+        // author-class so the HUMAN/AGENT badge paints — independent of whether
+        // the body happens to carry an authorClass string.
+        this.resolveAuthorClass(senderId);
         useChatStore.getState().addEnvelope(getTopicId(descriptor), {
           ...envelope,
           message: processedPayload

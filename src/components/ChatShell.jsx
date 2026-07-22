@@ -50,11 +50,21 @@ const ChatShell = () => {
 
   // Sync handle metadata to useChatStore
   useEffect(() => {
-    useChatStore.setState({ 
+    useChatStore.setState({
       currentHandle: activeHandle,
-      currentDeclaration: declaration 
+      currentDeclaration: declaration
     });
   }, [activeHandle, declaration]);
+
+  // Declare our author-class as a signed kernel attestation so OTHER apps (Axona
+  // Minimal, other clients) can resolve it via getAuthorClass. Runs once the peer,
+  // handle, and a concrete (human/agent) declaration are all present; the client
+  // dedups so this is safe to re-fire on any of those changing.
+  useEffect(() => {
+    if (peer && activeHandle && (declaration === 'human' || declaration === 'agent')) {
+      AxonaChatClient.declareAuthorClass().catch(() => {});
+    }
+  }, [peer, activeHandle, declaration]);
 
   // Handle window resizing
   useEffect(() => {

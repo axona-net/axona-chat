@@ -80,17 +80,16 @@ const persistLastRead = (map) => {
   try { localStorage.setItem('axona-last-read', JSON.stringify(map)); } catch { /* */ }
 };
 
-// A message counts toward unread only if the user could actually read it:
-// declared (§6.5 renders undeclared as a stub), not their own, and published
-// after the watermark. Envelope ts is publish time, so replayed history
-// older than the watermark stays read.
+// A message counts toward unread if it's not the user's own and was published
+// after the watermark. Envelope ts is publish time, so replayed history older
+// than the watermark stays read. Author-class is provenance, NOT a read gate —
+// undeclared messages are shown (unbadged) and so also count as unread.
 export const countUnread = (state, topicId) => {
   const mark = state.lastRead[topicId] || 0;
   const own = state.currentHandle?.authorId;
   return (state.messages[topicId] || []).filter(m =>
     m.ts > mark &&
-    m.signerPubkey !== own &&
-    (m.message?.authorClass === 'human' || m.message?.authorClass === 'agent')
+    m.signerPubkey !== own
   ).length;
 };
 
@@ -122,6 +121,13 @@ export const useChatStore = create((set, get) => ({
   // Presence: map of authorId -> { handle, declaration, lastSeen }
   presence: {},
   topicMetrics: {},
+
+  // Author-class cache: signerPubkey (Author ID) -> resolved, VERIFIED class from
+  // the kernel's signed attestation (peer.getAuthorClass), NOT the in-body string.
+  // Shape: { class:'human'|'agent'|'service'|'bridge'|'relay'|'unstated'|'pending',
+  //          operatorVerified, label }. Absence/'unstated' renders UNBADGED, never
+  //          hidden (§6.5) — author-class is provenance, not a gate.
+  authorClasses: {},
 
   // Active handle and declaration (mirrored from HandleContext for easy store access)
   currentHandle: null,
@@ -311,6 +317,15 @@ export const useChatStore = create((set, get) => ({
         }
       };
     });
+  },
+
+  // Record the resolved, verified author-class for a signer. Called by
+  // AxonaChatClient.resolveAuthorClass after a peer.getAuthorClass() pull.
+  setAuthorClassResolved: (signer, info) => {
+    if (!signer) return;
+    set(state => ({
+      authorClasses: { ...state.authorClasses, [signer]: info }
+    }));
   },
 
   addPrivateConversation: (partnerId, topic, key) => {

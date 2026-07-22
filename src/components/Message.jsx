@@ -17,6 +17,9 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
   const { msgId, signerPubkey, ts } = envelope;
   const payload = envelope.message;
   const { currentHandle } = useChatStore();
+  // VERIFIED author-class from the kernel's signed attestation (getAuthorClass),
+  // keyed by the authenticated signerPubkey — NOT the spoofable in-body string.
+  const resolvedClass = useChatStore(s => s.authorClasses[signerPubkey]?.class);
   const [showConfirm, setShowConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -71,28 +74,19 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
     return () => ro.disconnect();
   }, []);
 
+  // Resolve the sender's signed author-class on demand (cached in the store, one
+  // pull per author) so the badge paints even for messages that arrived before
+  // the client-side resolver ran (e.g. replayed history).
+  useLayoutEffect(() => {
+    if (signerPubkey) AxonaChatClient.resolveAuthorClass(signerPubkey);
+  }, [signerPubkey]);
+
   if (!payload) return null;
 
-  // 1. Declaration enforcement (§6.5)
-  // Absence of declaration (or undeclared class) hides the message
-  const hasDeclaration = payload.authorClass === 'human' || payload.authorClass === 'agent';
-  if (!hasDeclaration) {
-    return (
-      <div style={{
-        margin: '0.5rem 0',
-        padding: '0.6rem 0.8rem',
-        borderRadius: 'var(--radius)',
-        background: 'rgba(255, 107, 107, 0.05)',
-        borderLeft: '3px solid #ff6b6b',
-        fontSize: '0.8rem',
-        color: 'var(--color-muted)',
-        animation: 'fadeIn 0.3s ease-out',
-        marginLeft: `${level * 1.2}rem`
-      }}>
-        <i>hidden: author has not declared human/agent class ({signerPubkey?.slice(0, 8)})</i>
-      </div>
-    );
-  }
+  // Author-class is provenance, NOT a read gate (kernel: "absence means
+  // UNSTATED, never a default"). Undeclared authors render normally, just
+  // WITHOUT a class badge — they are never hidden. Only 'human'/'agent' badge.
+  const badgeClass = resolvedClass === 'human' || resolvedClass === 'agent' ? resolvedClass : null;
 
   const isOwn = currentHandle && signerPubkey === currentHandle.authorId;
   const formattedTime = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -209,17 +203,20 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
             {payload.handle || 'Anonymous'}
           </span>
           
-          {/* Badge declaration class */}
-          <span style={{
-            fontSize: '0.6rem',
-            padding: '1px 5px',
-            borderRadius: '10px',
-            background: payload.authorClass === 'human' ? 'rgba(52, 152, 219, 0.15)' : 'rgba(155, 89, 182, 0.15)',
-            color: payload.authorClass === 'human' ? '#3498db' : '#9b59b6',
-            fontWeight: '600'
-          }}>
-            {payload.authorClass === 'human' ? 'HUMAN' : 'AGENT'}
-          </span>
+          {/* Badge the VERIFIED author-class (signed attestation), when declared.
+              Undeclared authors simply get no badge — never hidden. */}
+          {badgeClass && (
+            <span style={{
+              fontSize: '0.6rem',
+              padding: '1px 5px',
+              borderRadius: '10px',
+              background: badgeClass === 'human' ? 'rgba(52, 152, 219, 0.15)' : 'rgba(155, 89, 182, 0.15)',
+              color: badgeClass === 'human' ? '#3498db' : '#9b59b6',
+              fontWeight: '600'
+            }}>
+              {badgeClass === 'human' ? 'HUMAN' : 'AGENT'}
+            </span>
+          )}
 
           {payload.isEncrypted && (
             <span style={{
