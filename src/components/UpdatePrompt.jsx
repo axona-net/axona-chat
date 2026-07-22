@@ -21,6 +21,28 @@ const UpdatePrompt = () => {
     }
   });
 
+  // Reload the moment the new worker takes control of this tab. This is a
+  // belt-and-suspenders backstop to vite-plugin-pwa's own 'controlling'
+  // listener: that listener only reloads when workbox-window classifies the
+  // controllerchange as an update, which it doesn't for a tab the previous
+  // worker never controlled — the exact case that made H's Reload "do
+  // nothing." We arm it ONLY on click (never at mount) so a first-install
+  // clients.claim can't trigger a spurious reload, and guard with a ref so we
+  // reload exactly once.
+  const reloadedRef = React.useRef(false);
+  const reloadOnControllerChange = () => {
+    if (reloadedRef.current) return;
+    reloadedRef.current = true;
+    window.location.reload();
+  };
+
+  const doReload = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', reloadOnControllerChange);
+    }
+    updateServiceWorker(true);
+  };
+
   if (!needRefresh) return null;
 
   return (
@@ -47,7 +69,7 @@ const UpdatePrompt = () => {
     >
       <span>✨ A new version of Axona Chat is available.</span>
       <button
-        onClick={() => updateServiceWorker(true)}
+        onClick={doReload}
         title="Reload to load the latest version"
         style={{
           padding: '0.3rem 0.9rem',

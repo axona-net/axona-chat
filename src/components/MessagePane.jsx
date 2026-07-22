@@ -2,10 +2,12 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useChatStore } from '../stores/useChatStore.js';
 import Message from './Message.jsx';
 import AxonaChatClient from '../services/AxonaChatClient.js';
+import { usePeer } from '../contexts/PeerContext.jsx';
 import { buildTopicLink } from '../services/topicLink.js';
 
 const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => {
   const { activeTopic, activeTopicId, messages, currentHandle, moderationQueue, topicMetrics } = useChatStore();
+  const { status } = usePeer();
   const advertisedTopics = useChatStore(s => s.advertisedTopics);
   const listRef = useRef(null);
   const contentRef = useRef(null);
@@ -335,8 +337,41 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
             fontSize: '0.9rem',
             gap: '0.5rem'
           }}>
-            <span>No messages in this channel yet.</span>
-            <span style={{ fontSize: '0.8rem' }}>Be the first to speak!</span>
+            {/* An empty pane has three very different meanings; conflating them
+                as "Be the first to speak!" is what made a whole list of
+                reconnecting/timed-out topics read as broken after a reload.
+                Disambiguate: still connecting → history can't arrive yet; the
+                topic reports messages on the network but none have replayed
+                locally → history is still loading (or its holders are
+                unreachable); the topic genuinely holds nothing → truly empty. */}
+            {(() => {
+              const metrics = topicMetrics[activeTopicId];
+              const networkCount = metrics && metrics.current_count != null ? metrics.current_count : null;
+              if (!status?.ready) {
+                return (<>
+                  <span>Connecting to the network…</span>
+                  <span style={{ fontSize: '0.8rem' }}>This channel’s history loads once you’re online.</span>
+                </>);
+              }
+              if (networkCount > 0) {
+                return (<>
+                  <span>Loading history…</span>
+                  <span style={{ fontSize: '0.8rem' }}>
+                    {networkCount} message{networkCount === 1 ? '' : 's'} on the network — fetching from the mesh.
+                  </span>
+                </>);
+              }
+              if (networkCount === 0) {
+                return (<>
+                  <span>No messages in this channel yet.</span>
+                  <span style={{ fontSize: '0.8rem' }}>Be the first to speak!</span>
+                </>);
+              }
+              return (<>
+                <span>No messages loaded yet.</span>
+                <span style={{ fontSize: '0.8rem' }}>Any history for this channel appears here as it syncs.</span>
+              </>);
+            })()}
           </div>
         ) : (
           <div ref={contentRef}>

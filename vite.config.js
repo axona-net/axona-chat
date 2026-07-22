@@ -31,7 +31,18 @@ export default defineConfig(() => ({
       // never the SW cache. Exclude the large social image.
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,woff2}', 'favicon.png', 'apple-touch-icon.png', 'pwa-*.png'],
-        navigateFallbackDenylist: [/^\/[^/]+\.[^/]+$/]
+        navigateFallbackDenylist: [/^\/[^/]+\.[^/]+$/],
+        // clientsClaim so the freshly-activated worker CLAIMS this tab the
+        // instant the user clicks Reload (which posts SKIP_WAITING). Without
+        // it, a tab that was never controlled by the previous worker — the
+        // normal case right after a PWA first ships, which is exactly the
+        // v0.26→v0.27 update H hit — activates the new worker but fires NO
+        // controllerchange, so vite-plugin-pwa's reload-on-'controlling'
+        // never runs and the Reload button appears to do nothing while the
+        // toast survives a manual refresh. Claiming forces controllerchange.
+        // Safe for the 'prompt' flow: the worker still WAITS until the user
+        // clicks (skipWaiting is message-gated), so this never auto-updates.
+        clientsClaim: true
       },
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
