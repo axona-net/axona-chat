@@ -1,6 +1,7 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { useChatStore } from '../stores/useChatStore.js';
 import AxonaChatClient from '../services/AxonaChatClient.js';
 import LinkPreview from './LinkPreview.jsx';
@@ -260,7 +261,10 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
           <ReactMarkdown
             // GFM: tables, strikethrough, task lists, autolinks — a pasted
             // markdown document must render whole, not a subset (§7.2).
-            remarkPlugins={[remarkGfm]}
+            // remark-breaks: a single newline becomes a hard line break, so
+            // pasted multi-line text keeps its line structure instead of
+            // Markdown collapsing single newlines into spaces (§6.3).
+            remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{
               a: ({ href, children }) =>
                 isTopicLink(href) ? (
