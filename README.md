@@ -27,10 +27,10 @@ Axona Chat is the reference application for the protocol's application surface:
 - **End-to-end responsibility** — like the Internet's own protocols, Axona
   moves bytes; anything confidential is the application's job to encrypt.
 
-## Design document
+## Recipe book
 
 The app is specified in
-[`Axona_Chat_Design_v0_6.md`](Axona_Chat_Design_v0_6.md) — the worked example
+[`Axona_Chat_Recipe_Book_v0_6.md`](Axona_Chat_Recipe_Book_v0_6.md) — the worked example
 of building a real application against the kernel's AI documentation pair
 ([AI Grounding + AI Reference](https://github.com/axona-net/axona-docs/tree/main/programmer-guide)).
 It covers the topic model, message schema, presence protocol, scroll and

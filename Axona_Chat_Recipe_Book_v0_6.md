@@ -1,4 +1,4 @@
-# Axona Chat — Design Document
+# Axona Chat — Recipe Book
 
 **Version 0.6 · Targets kernel 4.30.0 / wire 4.0 · David A. Smith**
 
