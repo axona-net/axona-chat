@@ -6,7 +6,15 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 // deploy has been fetched and is waiting. We surface a small toast; the reload
 // only happens when the user clicks (registerType 'prompt'). In dev the SW is
 // disabled, so needRefresh stays false and nothing renders.
-const CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly re-check while a tab stays open
+//
+// Because the SW serves the PRECACHED shell instantly, a manual browser reload
+// shows the OLD version and only then discovers the new deploy — forcing a
+// second reload via the toast. To avoid that we detect the deploy PROACTIVELY,
+// so the toast appears on its own and the user reloads exactly once:
+//   - a short poll while the tab stays open, and
+//   - an immediate check whenever the tab regains focus or the network returns
+//     (the moments a returning user is most likely to be a deploy behind).
+const CHECK_INTERVAL_MS = 60 * 1000; // re-check every minute while a tab stays open
 
 const UpdatePrompt = () => {
   const {
@@ -15,9 +23,14 @@ const UpdatePrompt = () => {
   } = useRegisterSW({
     onRegisteredSW(_swUrl, registration) {
       if (!registration) return;
-      // Long-lived tabs won't otherwise notice a deploy until reopened; poll
-      // the SW so the toast can appear the same day.
-      setInterval(() => registration.update(), CHECK_INTERVAL_MS);
+      const check = () => { registration.update().catch(() => {}); };
+      setInterval(check, CHECK_INTERVAL_MS);
+      // Refocusing the tab is the most common "am I a deploy behind?" moment —
+      // check right then so the toast is already waiting, no manual reload.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') check();
+      });
+      window.addEventListener('online', check);
     }
   });
 
