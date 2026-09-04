@@ -11,9 +11,17 @@ import { useEffect, useState } from 'react';
 // then have to share ~400px of height, so the app "stays in portrait" from the
 // user's point of view and most of it is off-screen or unreachable.
 //
-// A landscape phone is short, not wide. So compact means EITHER dimension is
-// small, and 500px of height is the discriminator: landscape phones sit at
-// 320-430, while a desktop browser window is essentially never that short.
+// A landscape phone is short, not wide — so a short viewport is part of the
+// signal. But height ALONE is wrong: a wide desktop window dragged short (or a
+// laptop with a shallow window) is not a phone, and the bare `(max-height:500px)`
+// forced it into the drawer/overlay layout with the topic list sitting on top of
+// the messages (2026-09-04, Firefox, a short window). Height marks a landscape
+// phone only together with the INPUT device: a phone has a coarse PRIMARY pointer
+// and a mouse/trackpad desktop has a fine one, whatever the window size. So the
+// short-viewport arm is gated on `(pointer: coarse)` — a touch device that is
+// also short is a landscape phone; a short desktop window keeps its fine pointer
+// and stays two-column. Width alone still forces compact: a truly narrow window
+// has no room for two columns, pointer notwithstanding.
 //
 // matchMedia rather than a resize handler on innerWidth: the browser evaluates
 // the query itself, it fires on orientationchange without a separate listener,
@@ -22,7 +30,11 @@ import { useEffect, useState } from 'react';
 // they already had the same magic number copied twice.
 // =====================================================================
 
-export const COMPACT_QUERY = '(max-width: 800px), (max-height: 500px)';
+// width≤800 (narrow — no room for two columns) OR a short viewport that is ALSO a
+// touch device (a landscape phone). A short DESKTOP window has a fine pointer and
+// stays two-column. Level-3 syntax (features in their own parens, joined by
+// `and`, alternatives by comma; no nested-paren grouping) for old-WebKit phones.
+export const COMPACT_QUERY = '(max-width: 800px), (max-height: 500px) and (pointer: coarse)';
 
 export const useCompactLayout = () => {
   const [compact, setCompact] = useState(
