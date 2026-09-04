@@ -126,6 +126,12 @@ export const PeerProvider = ({ children }) => {
                 } else if (data.pc === 'connected') {
                   setMeshDiag(d => ({ ...d, ok: d.ok + 1 }));
                 }
+              } else if (evt === 'ice-candidate-local' && data) {
+                // TEMP Safari diagnostic: surface local ICE candidate types so we can
+                // see whether Safari yields usable srflx/relay candidates or only host/mDNS.
+                console.log(`[axona-ice] local ${data.type}/${data.proto} ${data.addr ?? ''}:${data.port ?? ''} → peer ${String(data.peerId).slice(0, 10)}…`);
+              } else if (evt === 'ice-state' && data) {
+                console.log(`[axona-ice] iceConnectionState=${data.ice} peer ${String(data.peerId).slice(0, 10)}…`);
               }
             });
           } catch { /* level not supported — ignore */ }
