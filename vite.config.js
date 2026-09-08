@@ -22,9 +22,20 @@ export default defineConfig(() => ({
     // detects the change and the in-app UpdatePrompt offers a one-click
     // reload — the canonical PWA pattern, NOT a network-controlled channel
     // (a dev-pushed control topic would contradict the no-central-operator
-    // boundary §3). registerType 'prompt' means we never reload without the
-    // user's click. devOptions stays disabled so the SW never interferes
-    // with the dev server / HMR.
+    // boundary §3).
+    //
+    // registerType STAYS 'prompt', but it no longer means "wait for a click".
+    // It means the skipWaiting message is sent by US, from UpdatePrompt.jsx, so
+    // the app chooses the moment. As of 0.57.0 it applies the update on its own
+    // and only defers while the caret is in an editable field — because a
+    // client left on a superseded kernel reaches the bridge and then never
+    // meshes, which presents as an outage rather than as a stale build. That
+    // misdiagnosis cost 2026-09-04 (366e4b8, blamed on Safari's ICE) and again
+    // 2026-09-08. 'autoUpdate' is NOT used: it calls skipWaiting the instant a
+    // worker installs, which would reload mid-sentence and leaves no room to
+    // defer. See the header of UpdatePrompt.jsx for the full account.
+    //
+    // devOptions stays disabled so the SW never interferes with dev / HMR.
     VitePWA({
       registerType: 'prompt',
       // Only precache the app shell; message/media come from the P2P mesh,
@@ -40,8 +51,10 @@ export default defineConfig(() => ({
         // controllerchange, so vite-plugin-pwa's reload-on-'controlling'
         // never runs and the Reload button appears to do nothing while the
         // toast survives a manual refresh. Claiming forces controllerchange.
-        // Safe for the 'prompt' flow: the worker still WAITS until the user
-        // clicks (skipWaiting is message-gated), so this never auto-updates.
+        // Still safe: skipWaiting remains message-gated, so the worker waits
+        // until something sends the message. Since 0.57.0 that sender is
+        // UpdatePrompt.jsx rather than a button, but claiming still cannot
+        // activate a worker on its own.
         clientsClaim: true
       },
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
