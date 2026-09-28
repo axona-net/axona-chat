@@ -194,10 +194,18 @@ export const useChatStore = create((set, get) => {
   setActiveTopic: async (topic) => {
     // Topic can be a descriptor
     const id = getTopicId(topic);
-    set({ activeTopic: topic, activeTopicId: id });
+    // Choosing a topic leaves the Stream — the two are different ways of
+    // looking and only one can be on screen.
+    set({ activeTopic: topic, activeTopicId: id, streamMode: false });
     persistLastTopic(topic);
     get().markTopicRead(id);
   },
+
+  // STREAM VIEW: every SUBSCRIBED topic merged into one list in the order this
+  // client saw things (David, council seq 433). It never auto-subscribes — it
+  // shows what you already joined and nothing else (Aster seq 437, Vega 434).
+  streamMode: false,
+  setStreamMode: (on) => set({ streamMode: !!on }),
 
   // Advance the topic's watermark to its newest message ts (the user has now
   // seen everything displayed). Newest-message ts, NOT Date.now(): replay can
@@ -278,10 +286,17 @@ export const useChatStore = create((set, get) => {
       const topicMsgs = state.messages[topicId] || [];
       // Prevent duplicates
       if (topicMsgs.some(m => m.msgId === envelope.msgId)) return {};
+      // LOCAL ARRIVAL TIME, stamped here because nothing on the wire carries it.
+      // The Stream view merges topics by the order THIS CLIENT saw things, which
+      // is the only ordering it can honestly claim: `ts` is the publisher's
+      // clock, and replayed history arrives long after it was written. The
+      // underscore marks it as ours — it is not part of the envelope anyone
+      // signed, and it must never be compared across two machines.
+      const stamped = envelope._arrivedAt ? envelope : { ...envelope, _arrivedAt: Date.now() };
       const next = {
         messages: {
           ...state.messages,
-          [topicId]: [...topicMsgs, envelope]
+          [topicId]: [...topicMsgs, stamped]
         }
       };
       // A message arriving on the topic the user is LOOKING AT is read on

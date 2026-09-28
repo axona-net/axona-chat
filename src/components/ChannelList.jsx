@@ -6,6 +6,8 @@ const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '
 
 const ChannelList = ({ onOpenModal }) => {
   const { subscribedTopics, activeTopic, setActiveTopic, removeTopic } = useChatStore();
+  const streamMode = useChatStore(s => s.streamMode);
+  const setStreamMode = useChatStore(s => s.setStreamMode);
   // Subscribe to the slices unread counts derive from, so badges update live.
   const messages = useChatStore(s => s.messages);
   const lastRead = useChatStore(s => s.lastRead);
@@ -73,6 +75,37 @@ const ChannelList = ({ onOpenModal }) => {
 
       {/* Top section: Title and Channel List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', overflowY: 'auto', flex: 1 }}>
+        {/* STREAM sits ABOVE the topic list, because it is not a topic. It is a
+            different way of looking at the ones you already have — selecting a
+            topic leaves it, and it never adds a subscription of its own. */}
+        <button
+          type="button"
+          onClick={() => setStreamMode(true)}
+          aria-current={streamMode ? 'true' : undefined}
+          title="Every topic you have joined, merged into one list in the order this browser received them"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            width: '100%',
+            padding: '0.5rem 0.6rem',
+            borderRadius: 'var(--radius)',
+            background: streamMode ? 'var(--color-bg)' : 'transparent',
+            border: streamMode ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
+            color: streamMode ? 'var(--color-primary)' : 'var(--color-text)',
+            font: 'inherit',
+            fontSize: '0.85rem',
+            fontWeight: streamMode ? '700' : '600',
+            textAlign: 'left',
+            cursor: 'pointer'
+          }}
+        >
+          <span aria-hidden="true">≋</span>
+          Stream
+          <span style={{ marginLeft: 'auto', fontSize: '0.6rem', color: 'var(--color-muted)', fontWeight: '400' }}>
+            all topics
+          </span>
+        </button>
         {/* paddingRight keeps the Add-topic control CLEAR OF THE SCROLLBAR. This
             header sits inside the scrolling container, so once the topic list
             overflows, a right-edge scrollbar appears and a button justified hard
@@ -121,7 +154,8 @@ const ChannelList = ({ onOpenModal }) => {
             // channel is "council": a display name is not an identity.
             // (Aster, council seq 442.)
             const topicId = getTopicId(topic);
-            const isActive = !!activeTopic && getTopicId(activeTopic) === topicId;
+            // No topic is the selected one while the Stream is showing.
+            const isActive = !streamMode && !!activeTopic && getTopicId(activeTopic) === topicId;
             // The row key follows identity too. An index key re-associates rows
             // with the wrong topic when the list is reordered or spliced.
             const unread = isActive ? 0 : countUnread({ messages, lastRead, currentHandle }, topicId);

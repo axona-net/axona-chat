@@ -3,6 +3,7 @@ import TopicTicker from './TopicTicker.jsx';
 import StatusFooter from './StatusFooter.jsx';
 import ChannelList from './ChannelList.jsx';
 import MessagePane from './MessagePane.jsx';
+import StreamPane from './StreamPane.jsx';
 import Composer from './Composer.jsx';
 import Modals from './Modals.jsx';
 import { usePeer } from '../contexts/PeerContext.jsx';
@@ -33,6 +34,7 @@ const ChatShell = () => {
   // open. prev-ref comparison instead of skip-first-run: survives StrictMode's
   // double-invoked effects.
   const activeTopicId = useChatStore(s => s.activeTopicId);
+  const streamMode = useChatStore(s => s.streamMode);
   const prevTopicIdRef = useRef(null);
   useEffect(() => {
     if (prevTopicIdRef.current !== null && prevTopicIdRef.current !== activeTopicId) {
@@ -214,19 +216,32 @@ const ChatShell = () => {
           height: '100%',
           background: 'var(--color-column-bg)'
         }}>
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <MessagePane
-              onOpenModal={handleOpenModal}
-              setReplyTarget={handleSetReply}
-              setPrivateReplyTarget={handleSetPrivateReply}
-            />
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            {streamMode ? (
+              <StreamPane
+                setReplyTarget={handleSetReply}
+                setPrivateReplyTarget={handleSetPrivateReply}
+              />
+            ) : (
+              <MessagePane
+                onOpenModal={handleOpenModal}
+                setReplyTarget={handleSetReply}
+                setPrivateReplyTarget={handleSetPrivateReply}
+              />
+            )}
           </div>
-          <Composer
-            replyTarget={replyTarget}
-            privateReplyTarget={privateReplyTarget}
-            clearReplyTargets={clearReplyTargets}
-            onOpenModal={handleOpenModal}
-          />
+          {/* The composer stays hidden in the Stream: a merged view has no ONE
+              topic to post to, and silently picking the last-active one would
+              send a message somewhere the reader was not looking. Replying to a
+              specific message still works — that carries its own topic. */}
+          {!streamMode && (
+            <Composer
+              replyTarget={replyTarget}
+              privateReplyTarget={privateReplyTarget}
+              clearReplyTargets={clearReplyTargets}
+              onOpenModal={handleOpenModal}
+            />
+          )}
         </div>
 
         {/* Mobile: floating pill to reopen the topic drawer, with the total
