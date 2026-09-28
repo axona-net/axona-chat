@@ -28,11 +28,14 @@ const MAX_DEPTH  = 6;
 const MAX_NODES  = 300;
 const MAX_STRING = 500;
 
+// Themed via CSS variables on `.json-view` (see index.css), NOT hardcoded hex.
+// The originals were dark-theme syntax colours sitting on a rgba(0,0,0,0.18)
+// panel, which over a light page is a heavy grey slab with pale text on it.
 const COLORS = {
-  key:    'var(--color-primary-light, #7fb3ff)',
-  string: '#98c379',
-  number: '#d19a66',
-  bool:   '#c678dd',
+  key:    'var(--jv-key)',
+  string: 'var(--jv-string)',
+  number: 'var(--jv-number)',
+  bool:   'var(--jv-bool)',
   null:   'var(--color-muted)',
   punct:  'var(--color-muted)',
 };
@@ -137,11 +140,11 @@ const JsonView = ({ value, title }) => {
 
   return (
     <div
+      className="json-view"
       style={{
         fontFamily: 'ui-monospace, monospace',
         fontSize: '0.72rem',
         lineHeight: 1.5,
-        background: 'rgba(0,0,0,0.18)',
         border: '1px solid var(--border-color)',
         borderRadius: 'var(--radius)',
         padding: '0.5rem 0.6rem',

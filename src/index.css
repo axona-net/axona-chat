@@ -230,3 +230,30 @@ li, .ProseMirror li {
   opacity: 0.7;
   padding-left: 0.15em;
 }
+
+/* ── Structured payload view (JsonView) ────────────────────────────────────
+   Themed with CSS variables rather than the hardcoded hex the component
+   started with. Those were dark-theme syntax colours on a rgba(0,0,0,0.18)
+   panel: over a LIGHT page that panel reads as a heavy grey slab, and pale
+   green strings on it are close to unreadable. David reported the grey as too
+   dark (council seq 476).
+
+   The dark values are the originals. The light values follow the convention
+   this stylesheet already uses for `pre` — a barely-there rgba(0,0,0,0.04)
+   wash — with syntax colours darkened enough to hold contrast on it. */
+.json-view {
+  --jv-panel:  rgba(255, 255, 255, 0.04);
+  --jv-key:    #7fb3ff;
+  --jv-string: #98c379;
+  --jv-number: #d19a66;
+  --jv-bool:   #c678dd;
+  background: var(--jv-panel);
+}
+
+body.light-theme .json-view {
+  --jv-panel:  rgba(0, 0, 0, 0.04);
+  --jv-key:    #1d4ed8;
+  --jv-string: #15803d;
+  --jv-number: #b45309;
+  --jv-bool:   #7e22ce;
+}

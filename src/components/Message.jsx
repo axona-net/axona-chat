@@ -254,6 +254,25 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
     return typeof c === 'string' && c.length > 0 && c.length < 32 ? c : null;
   })();
 
+  // WHO IS THIS FROM, when the envelope carries no handle. David (council 476):
+  // "(unwrapped publish)" says what went wrong, not who is speaking, and a
+  // reader wants the second. A raw payload usually names itself somewhere — a
+  // device slug, a handle, a name — so look, in a fixed order, and say where it
+  // came from rather than passing it off as an envelope handle.
+  //
+  // This is a DISPLAY FALLBACK, not identity. Anything inside the body is
+  // self-asserted, exactly like authorClass; the authenticated fact is the
+  // signer, which is shown beside it as it always was. The publisher wrapping
+  // properly remains the real fix.
+  const bodyName = (() => {
+    if (!isRawPublish || !structuredPayload) return null;
+    for (const k of ['handle', 'deviceName', 'name', 'deviceId']) {
+      const v = structuredPayload[k];
+      if (typeof v === 'string' && v.trim() && v.length < 64) return v.trim();
+    }
+    return null;
+  })();
+
   // DATE + time, never time alone (user-reported 2026-07-25). A time-only stamp is
   // actively misleading on this network: replayed history arrives interleaved with
   // live traffic, so a message from YESTERDAY renders next to one from a minute ago
@@ -387,9 +406,19 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 'bold', color: isOwn ? 'var(--color-primary)' : 'var(--color-text)', fontSize: '0.85rem' }}>
             {isRawPublish
-              ? <span title="Published without a std/message envelope, so it carries no handle. The signer is still authenticated.">(unwrapped publish)</span>
+              ? (bodyName
+                  ? <span title="This name comes from inside the message body, not from a std/message envelope handle — the publisher named itself. The authenticated fact is the signer shown beside it.">{bodyName}</span>
+                  : <span title="Published without a std/message envelope and naming nothing inside its body, so there is no handle to show. The signer is still authenticated.">(unwrapped publish)</span>)
               : (payload.handle || 'Anonymous')}
           </span>
+          {isRawPublish && bodyName && (
+            <span
+              title="The name shown was read from the message body rather than an envelope handle."
+              style={{ fontSize: '0.55rem', color: 'var(--color-muted)', fontWeight: '600' }}
+            >
+              from body
+            </span>
+          )}
 
           {/* SELF-DECLARED CLASS, shown DISTINCTLY from an attested one.
               A publisher can type authorClass into its own body; that is a
@@ -421,7 +450,7 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
                 fontWeight: '600'
               }}
             >
-              {selfDeclaredClass.toUpperCase()}? · self-declared
+              {selfDeclaredClass.toUpperCase()} · self-declared
             </span>
           )}
           
