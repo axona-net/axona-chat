@@ -47,7 +47,25 @@ describe('author-class badges', () => {
 
   it('the badge reads the RESOLVED attestation, not payload.authorClass', () => {
     expect(/authorClasses\[signerPubkey\]/.test(msg)).toBe(true);
-    expect(/payload\.authorClass/.test(msg)).toBe(false);
+    // badgeClass — the SOLID badge — is derived from the resolved attestation
+    // and from nothing else. The body string may now be READ (for the dashed
+    // self-declared chip), so a blanket "payload.authorClass never appears"
+    // check no longer says what matters. This one does: the badge's own
+    // derivation must not touch it.
+    expect(/const badgeClass = BADGES\[resolvedClass\] \? resolvedClass : null;/.test(msg)).toBe(true);
+    expect(/badgeClass\s*=\s*[^\n]*payload\.authorClass/.test(msg)).toBe(false);
+  });
+
+  it('a SELF-DECLARED class is shown separately and never as the solid badge', () => {
+    // Rendered only when there is no attested class, visually distinct
+    // (dashed outline, not a fill), and labelled as a claim on the chip itself.
+    expect(/!badgeClass && selfDeclaredClass/.test(msg)).toBe(true);
+    expect(/self-declared/.test(msg)).toBe(true);
+    expect(/border: '1px dashed/.test(msg)).toBe(true);
+  });
+
+  it('a RAW publish still shows what it calls itself, from inside the JSON', () => {
+    expect(/isRawPublish \? structuredPayload\?\.authorClass : payload\.authorClass/.test(msg)).toBe(true);
   });
 
   // KNOWN GAP, asserted so it cannot be forgotten. The client can recognise a

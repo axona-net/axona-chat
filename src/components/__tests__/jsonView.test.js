@@ -53,7 +53,25 @@ describe('JsonView renders untrusted data safely', () => {
 
 describe('Message decides when a payload is structured', () => {
   it('parsing is guarded — a body that only looks like JSON must not throw', () => {
-    expect(/try \{\s*const parsed = JSON\.parse\(s\);/.test(msg)).toBe(true);
+    expect(/try \{\s*const parsed = JSON\.parse\(t\);/.test(msg)).toBe(true);
+    expect(/\} catch \{ return null; \}/.test(msg)).toBe(true);
+  });
+
+  // A RAW publish — a bare string with no std/message wrapper — must render as
+  // structure too. axona.track publishes this way, and before 0.71.0 every
+  // field the renderer looked for was undefined on a string, so the tile showed
+  // "Anonymous" with no body at all.
+  it('a raw string payload is parsed as structure, not left blank', () => {
+    expect(/const isRawPublish = typeof payload === 'string'/.test(msg)).toBe(true);
+    expect(/if \(isRawPublish\) return parseJsonish\(payload\);/.test(msg)).toBe(true);
+  });
+
+  it('a raw publish that is NOT JSON still shows its text', () => {
+    expect(/isRawPublish\s*\n?\s*\? \(structuredPayload \? '' : payload\)/.test(msg)).toBe(true);
+  });
+
+  it('a raw publish is labelled as unwrapped rather than as "Anonymous"', () => {
+    expect(/\(unwrapped publish\)/.test(msg)).toBe(true);
   });
 
   it('an unbounded body is not parsed at all', () => {

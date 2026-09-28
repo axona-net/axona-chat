@@ -206,6 +206,7 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
   // attests it, which is the correct fail-safe and not an oversight.
   const badgeClass = BADGES[resolvedClass] ? resolvedClass : null;
 
+
   const isOwn = currentHandle && signerPubkey === currentHandle.authorId;
 
   // The structured half of an instrument payload, when there is one. Accepts an
@@ -214,18 +215,43 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
   // Arrays and objects qualify; a bare number or string does not, because a tree
   // of one primitive is just the text again. Parsing is wrapped: a body that
   // merely LOOKS like JSON must not throw inside a render.
-  const structuredPayload = (() => {
-    const d = payload.data;
-    if (d !== null && typeof d === 'object') return d;
-    const t = payload.text;
-    if (typeof t !== 'string') return null;
-    const s = t.trim();
-    if (!(s.startsWith('{') || s.startsWith('['))) return null;
-    if (s.length > 64 * 1024) return null;       // do not parse an unbounded body
+  // A RAW PUBLISH: the body is a bare string with no std/message wrapper around
+  // it, so there is no handle, no authorClass and no text field — the whole
+  // payload IS the string. axona.track publishes this way, and before this the
+  // result was a tile reading "Anonymous" with no body at all, because every
+  // field the renderer looked for was undefined on a string.
+  //
+  // An open topic will carry raw publishes whether or not we would prefer
+  // envelopes, so the reader has to cope with one rather than render a blank.
+  const isRawPublish = typeof payload === 'string';
+
+  const parseJsonish = (s) => {
+    if (typeof s !== 'string') return null;
+    const t = s.trim();
+    if (!(t.startsWith('{') || t.startsWith('['))) return null;
+    if (t.length > 64 * 1024) return null;       // do not parse an unbounded body
     try {
-      const parsed = JSON.parse(s);
+      const parsed = JSON.parse(t);
       return parsed !== null && typeof parsed === 'object' ? parsed : null;
     } catch { return null; }
+  };
+
+  const structuredPayload = (() => {
+    if (isRawPublish) return parseJsonish(payload);
+    const d = payload.data;
+    if (d !== null && typeof d === 'object') return d;
+    return parseJsonish(payload.text);
+  })();
+
+  // The class the publisher TYPED into its own body, which is a CLAIM and not
+  // evidence. Read ONLY to render it as a claim (the dashed chip in the header),
+  // never to produce the solid badge — `badgeClass` above comes from the signed
+  // attestation and from nothing else. For a raw publish the claim lives inside
+  // the JSON itself, so an instrument publishing unwrapped still shows what it
+  // says it is. Declared AFTER isRawPublish/structuredPayload, which it reads.
+  const selfDeclaredClass = (() => {
+    const c = isRawPublish ? structuredPayload?.authorClass : payload.authorClass;
+    return typeof c === 'string' && c.length > 0 && c.length < 32 ? c : null;
   })();
 
   // DATE + time, never time alone (user-reported 2026-07-25). A time-only stamp is
@@ -318,7 +344,12 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
     );
   };
 
-  const displayText = payload.isEncrypted ? payload.decryptedText : payload.md || payload.text || '';
+  // A raw publish that is NOT JSON still has content — the string itself. A raw
+  // publish that IS JSON has its content in the tree above, so leaving the text
+  // empty avoids printing the same braces twice.
+  const displayText = isRawPublish
+    ? (structuredPayload ? '' : payload)
+    : (payload.isEncrypted ? payload.decryptedText : payload.md || payload.text || '');
 
   // Copy the WHOLE message source — especially useful for long messages,
   // where only part of the text is on screen at once.
@@ -355,8 +386,36 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 'bold', color: isOwn ? 'var(--color-primary)' : 'var(--color-text)', fontSize: '0.85rem' }}>
-            {payload.handle || 'Anonymous'}
+            {isRawPublish
+              ? <span title="Published without a std/message envelope, so it carries no handle. The signer is still authenticated.">(unwrapped publish)</span>
+              : (payload.handle || 'Anonymous')}
           </span>
+
+          {/* SELF-DECLARED CLASS, shown DISTINCTLY from an attested one.
+              A publisher can type authorClass into its own body; that is a
+              CLAIM, and the solid badge above is reserved for the kernel's
+              signed attestation. But refusing to show the claim at all left a
+              reader unable to see that a stream calls itself an instrument,
+              which is information they want. So: show it, in outline rather
+              than fill, and say "self-declared" on the chip itself. The two
+              must never be confusable at a glance — that is the whole reason
+              the attested badge is worth anything. */}
+          {!badgeClass && selfDeclaredClass && (
+            <span
+              title={`This publisher's own message body says "${selfDeclaredClass}". Nothing has attested it — the signer has published no signed class for this key, so treat it as a claim rather than a fact.`}
+              style={{
+                fontSize: '0.6rem',
+                padding: '0px 5px',
+                borderRadius: '10px',
+                background: 'transparent',
+                border: '1px dashed var(--color-muted)',
+                color: 'var(--color-muted)',
+                fontWeight: '600'
+              }}
+            >
+              {selfDeclaredClass.toUpperCase()}? · self-declared
+            </span>
+          )}
           
           {/* Badge the SIGNED author-class attestation, when declared. The
               signature authenticates WHO declared, not that the declaration is
