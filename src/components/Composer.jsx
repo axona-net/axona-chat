@@ -43,6 +43,13 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
     && activeTopic.owner !== activeHandle?.authorId;
   const [isExpanded, setIsExpanded] = useState(false);
   const [rawMarkdown, setRawMarkdown] = useState('');
+  // The last discarded draft, held so Delete is reversible. null = nothing to
+  // undo and no affordance shown.
+  const [discarded, setDiscarded] = useState(null);
+  const undoTimer = useRef(null);
+  // Clear the pending undo timer on unmount so it cannot fire a setState into a
+  // torn-down component.
+  useEffect(() => () => { if (undoTimer.current) clearTimeout(undoTimer.current); }, []);
   const [isRawView, setIsRawView] = useState(false);
 
   // ── shell-style recall of what you have sent before ────────────────────────
@@ -127,6 +134,31 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
       editor?.commands.setContent(rawMarkdown, { contentType: 'markdown' });
     }
     setIsRawView(checked);
+  };
+
+  // Discard the draft, keeping it recoverable. `discarded` holding a string is
+  // what shows the Undo affordance; restoring clears it. The timer only hides
+  // the offer — it never destroys anything the user could still want, because
+  // the editor is re-seeded from this value and nothing else was overwritten.
+  const handleDiscardDraft = () => {
+    const current = isRawView ? rawMarkdown : (editor?.getMarkdown() || '');
+    if (current.trim()) {
+      setDiscarded(current);
+      if (undoTimer.current) clearTimeout(undoTimer.current);
+      undoTimer.current = setTimeout(() => setDiscarded(null), 12000);
+    }
+    setRawMarkdown('');
+    editor?.commands.setContent('');
+    setIsExpanded(false);
+  };
+
+  const handleUndoDiscard = () => {
+    if (discarded == null) return;
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    setRawMarkdown(discarded);
+    editor?.commands.setContent(discarded, { contentType: 'markdown' });
+    setDiscarded(null);
+    setIsExpanded(true);
   };
 
   const handleSend = async () => {
@@ -255,7 +287,14 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
 
   const handleKeyDown = (e) => {
     if (isComposingEvent(e)) return;
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    // ENTER SENDS, SHIFT+ENTER MAKES A NEWLINE (David, council seq 433).
+    // Ctrl/Cmd+Enter keeps working: it was the only way to send until now and
+    // there is no reason to break the habit of anyone who has it.
+    //
+    // Ordered AFTER the composition guard above, deliberately. During IME
+    // composition Enter commits the candidate rather than meaning "send", so
+    // reaching this line at all requires the guard to have passed.
+    if (e.key === 'Enter' && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       handleSend();
       setIsExpanded(false);
@@ -405,11 +444,36 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
           >
             {ownerLocked
               ? <span>🔒 Controlled topic — posting is not enabled.</span>
-              : editor && editor.getText().trim()
-                ? <span style={{ color: 'var(--color-text)' }}>{editor.getText().slice(0, 100)}...</span>
-                : <span>Type a message... (Click to open markdown formatting composer)</span>
+              : discarded != null
+                ? <span style={{ color: 'var(--color-muted)' }}>Draft discarded.</span>
+                : editor && editor.getText().trim()
+                  ? <span style={{ color: 'var(--color-text)' }}>{editor.getText().slice(0, 100)}...</span>
+                  : <span>Type a message... (Click to open markdown formatting composer)</span>
             }
           </div>
+          {/* UNDO sits outside the click-to-open bar, so restoring a draft is not
+              the same gesture as opening the composer. It disappears on its own
+              after a few seconds — the offer expires, the text does not. */}
+          {discarded != null && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleUndoDiscard(); }}
+              title="Put the discarded draft back and reopen the composer"
+              style={{
+                padding: '0.4rem 0.9rem',
+                background: 'transparent',
+                color: 'var(--color-primary)',
+                fontWeight: '600',
+                fontSize: '0.8rem',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--color-primary)',
+                cursor: 'pointer',
+                flexShrink: 0
+              }}
+            >
+              Undo
+            </button>
+          )}
           {!ownerLocked && activeHandle && (
             <button
               onClick={() => onOpenModal?.('handles')}
@@ -645,10 +709,32 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
                   Sending as {declaration === 'agent' ? '🤖' : '🙋'} <b style={{ color: 'var(--color-text)' }}>{activeHandle?.name || '(no persona)'}</b>
                 </span>
                 <span style={{ fontSize: '0.72rem', color: 'var(--color-muted)' }}>
-                  Tip: <b>Ctrl + Enter</b> to send | <b>↑ / ↓</b> recalls messages you sent | Max size: 15 KB
+                  Tip: <b>Enter</b> sends | <b>Shift + Enter</b> new line | <b>↑ / ↓</b> recalls messages you sent | Max size: 15 KB
                 </span>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                {/* DELETE DISCARDS THE DRAFT — it never deletes a sent message
+                    (Aster, council seq 437). The wording and the placement both
+                    matter: it sits beside Draft, which KEEPS the text, so the
+                    pair reads as keep-or-discard rather than close-or-destroy.
+                    The discarded text is stashed so Undo can put it back; a
+                    destructive action with no way back does not belong on a
+                    control this close to Send. */}
+                <button
+                  onClick={handleDiscardDraft}
+                  title="Discard this draft and close the editor — you can undo straight after"
+                  style={{
+                    padding: '0.4rem 1rem',
+                    background: 'transparent',
+                    color: 'var(--color-muted)',
+                    fontWeight: '600',
+                    borderRadius: 'var(--radius)',
+                    border: '1px solid var(--border-color)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Delete
+                </button>
                 <button
                   onClick={() => setIsExpanded(false)}
                   title="Close the editor without sending — your draft is kept and reopens where you left off"

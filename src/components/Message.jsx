@@ -38,6 +38,28 @@ const isMousePointer = (type) => type === 'mouse';
 const canHover = typeof window !== 'undefined'
   && !!window.matchMedia?.('(hover: hover)').matches;
 
+// The author classes this client will BADGE, keyed by the value the kernel's
+// signed attestation returns. A class absent from this table is rendered
+// unbadged and never hidden — the kernel's rule is that absence means UNSTATED,
+// never a default, and an unrecognised future class must degrade to "no badge"
+// rather than to "Anonymous" or to nothing at all (Aster, council seq 437).
+// WHAT THE BADGE ACTUALLY MEANS, because the wording matters and my first
+// attempt got it wrong (Aster, council seq 458). A signed class attestation
+// authenticates WHICH AUTHOR MADE THE SELF-DECLARATION. It does NOT certify
+// that the declared nature is true, and nothing here independently checks it.
+// Binding the claim to an authenticated signer is worth a great deal — it is
+// the difference between a claim anyone can type and one only the key-holder
+// can make — but it is not certification, and the hint text must not say
+// "verified" as though some third party had confirmed the fact.
+const BADGES = {
+  human:      { label: 'HUMAN',      bg: 'rgba(52, 152, 219, 0.15)', fg: '#3498db',
+                hint: 'This author declared itself a person, signed with its own key. The signature shows who made the declaration — not that it is true.' },
+  agent:      { label: 'AGENT',      bg: 'rgba(155, 89, 182, 0.15)', fg: '#9b59b6',
+                hint: 'This author declared itself an autonomous agent, signed with its own key. The signature shows who made the declaration — not that it is true.' },
+  instrument: { label: 'INSTRUMENT', bg: 'rgba(26, 188, 156, 0.15)', fg: '#1abc9c',
+                hint: 'This author declared itself an automatic data source, signed with its own key. It reports readings rather than making claims, so read it with its calibration and failure modes in mind. The signature shows who declared it — not that the readings are right.' },
+};
+
 const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) => {
   const { msgId, signerPubkey, ts } = envelope;
   const payload = envelope.message;
@@ -154,7 +176,20 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
   // Author-class is provenance, NOT a read gate (kernel: "absence means
   // UNSTATED, never a default"). Undeclared authors render normally, just
   // WITHOUT a class badge — they are never hidden. Only 'human'/'agent' badge.
-  const badgeClass = resolvedClass === 'human' || resolvedClass === 'agent' ? resolvedClass : null;
+  //
+  // 'instrument' joins human and agent (David, council seq 449): the field names
+  // the NATURE OF THE SOURCE of the data — human, agent, instrument — while
+  // 'stream' would have described the data itself. An instrument makes no
+  // claims; it reports readings, and a reader should bring calibration-and-
+  // failure-mode scepticism rather than the kind you bring to an argument.
+  //
+  // NOTE THE SOURCE OF THIS VALUE. It is the kernel's SIGNED ATTESTATION keyed
+  // by the authenticated signer, never the in-body `authorClass` string, which
+  // any publisher can type. An instrument badge that could be self-asserted
+  // would be worth nothing — the badge's whole value is that it is not the
+  // claim. So a body that says 'instrument' gets NO badge until the signer
+  // attests it, which is the correct fail-safe and not an oversight.
+  const badgeClass = BADGES[resolvedClass] ? resolvedClass : null;
 
   const isOwn = currentHandle && signerPubkey === currentHandle.authorId;
 
@@ -288,18 +323,22 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
             {payload.handle || 'Anonymous'}
           </span>
           
-          {/* Badge the VERIFIED author-class (signed attestation), when declared.
-              Undeclared authors simply get no badge — never hidden. */}
+          {/* Badge the SIGNED author-class attestation, when declared. The
+              signature authenticates WHO declared, not that the declaration is
+              true. Undeclared authors simply get no badge — never hidden. */}
           {badgeClass && (
-            <span style={{
-              fontSize: '0.6rem',
-              padding: '1px 5px',
-              borderRadius: '10px',
-              background: badgeClass === 'human' ? 'rgba(52, 152, 219, 0.15)' : 'rgba(155, 89, 182, 0.15)',
-              color: badgeClass === 'human' ? '#3498db' : '#9b59b6',
-              fontWeight: '600'
-            }}>
-              {badgeClass === 'human' ? 'HUMAN' : 'AGENT'}
+            <span
+              title={BADGES[badgeClass].hint}
+              style={{
+                fontSize: '0.6rem',
+                padding: '1px 5px',
+                borderRadius: '10px',
+                background: BADGES[badgeClass].bg,
+                color: BADGES[badgeClass].fg,
+                fontWeight: '600'
+              }}
+            >
+              {BADGES[badgeClass].label}
             </span>
           )}
 

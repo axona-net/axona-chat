@@ -73,7 +73,13 @@ const ChannelList = ({ onOpenModal }) => {
 
       {/* Top section: Title and Channel List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', overflowY: 'auto', flex: 1 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        {/* paddingRight keeps the Add-topic control CLEAR OF THE SCROLLBAR. This
+            header sits inside the scrolling container, so once the topic list
+            overflows, a right-edge scrollbar appears and a button justified hard
+            right ends up touching it — reported by David (council seq 433): the
+            two controls fight for the same pixels and the button is easy to miss
+            against them. */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.35rem', paddingRight: '0.6rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 'bold', letterSpacing: '0.5px', color: 'var(--color-muted)' }}>TOPICS</span>
           {/* ONE button, because "Join" and "+ New" were one operation. Axona has
               no topic registry: a descriptor hashes to an address, subscribing IS
@@ -83,7 +89,19 @@ const ChannelList = ({ onOpenModal }) => {
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             <button
               onClick={() => onOpenModal('addTopic')}
-              style={{ padding: '2px 6px', fontSize: '0.7rem', background: 'var(--color-primary-dark)', color: '#fff' }}
+              style={{
+                padding: '0.3rem 0.7rem',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                letterSpacing: '0.2px',
+                background: 'var(--color-primary)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--radius)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.25)'
+              }}
               title="Add a topic — type a name to open or start one, or paste a link or descriptor someone shared"
             >
               + Add topic
