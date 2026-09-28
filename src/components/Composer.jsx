@@ -236,7 +236,25 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
     }
   };
 
+  // IME COMPOSITION GUARD (Aster, council seq 437/442).
+  //
+  // While an input method editor is composing — Japanese, Chinese, Korean and
+  // others — Enter COMMITS THE CANDIDATE. It does not mean "I have finished my
+  // message". A handler that treats every Enter as an action therefore fires
+  // mid-word and dispatches a half-typed sentence, and it does so ONLY for
+  // people composing in those scripts: invisible to whoever wrote the handler,
+  // constant for everyone affected.
+  //
+  // Two signals, because neither is universal. `isComposing` is the standard and
+  // is what modern browsers set; `keyCode === 229` is the long-standing legacy
+  // marker still emitted by some IMEs and older WebKit. Either one means HANDS
+  // OFF THE KEY. This guard lands BEFORE enter-to-send rather than alongside it,
+  // so the feature cannot ship ahead of its protection.
+  const isComposingEvent = (e) =>
+    !!(e.nativeEvent?.isComposing || e.isComposing || e.keyCode === 229 || e.nativeEvent?.keyCode === 229);
+
   const handleKeyDown = (e) => {
+    if (isComposingEvent(e)) return;
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSend();

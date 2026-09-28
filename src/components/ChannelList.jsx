@@ -92,13 +92,24 @@ const ChannelList = ({ onOpenModal }) => {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {subscribedTopics.map((topic, idx) => {
-            const isActive = activeTopic && activeTopic.name === topic.name && activeTopic.region === topic.region;
-            const unread = isActive ? 0 : countUnread({ messages, lastRead, currentHandle }, getTopicId(topic));
+          {subscribedTopics.map((topic) => {
+            // IDENTITY IS THE FULL DESCRIPTOR, NEVER THE DISPLAY NAME.
+            // getTopicId is `region:owner:name:write` — owner and write FOLD INTO
+            // the topic id, so two channels can share a name and a region and
+            // still be entirely different topics. This compared name+region only,
+            // which marked BOTH of them active and, through the ternary below,
+            // suppressed the other one's unread badge so its messages arrived
+            // silently. Same root cause as publishing to "axona/council" when the
+            // channel is "council": a display name is not an identity.
+            // (Aster, council seq 442.)
+            const topicId = getTopicId(topic);
+            const isActive = !!activeTopic && getTopicId(activeTopic) === topicId;
+            // The row key follows identity too. An index key re-associates rows
+            // with the wrong topic when the list is reordered or spliced.
+            const unread = isActive ? 0 : countUnread({ messages, lastRead, currentHandle }, topicId);
             return (
               <div
-                key={`${topic.name}-${idx}`}
-                onClick={() => handleSelectChannel(topic)}
+                key={topicId}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -108,14 +119,40 @@ const ChannelList = ({ onOpenModal }) => {
                   background: isActive ? 'var(--color-bg)' : 'transparent',
                   border: isActive ? '1px solid var(--border-color)' : '1px solid transparent',
                   color: isActive ? 'var(--color-primary)' : 'var(--color-text)',
-                  cursor: 'pointer',
                   transition: 'background 0.2s, color 0.2s',
                   fontSize: '0.85rem'
                 }}
                 onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--color-bg)'; }}
                 onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {/* SELECTION IS A REAL BUTTON: reachable by Tab, activates on
+                    Enter and Space, and announces its selected state. It was an
+                    onClick div, which does none of those. Rename and leave are
+                    SIBLINGS of it rather than nested inside — a button within a
+                    button is invalid markup and hides the inner control from
+                    assistive technology. */}
+                <button
+                  type="button"
+                  onClick={() => handleSelectChannel(topic)}
+                  aria-current={isActive ? 'true' : undefined}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '2px',
+                    overflow: 'hidden',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    margin: 0,
+                    font: 'inherit',
+                    color: 'inherit',
+                    textAlign: 'left',
+                    cursor: 'pointer'
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: isActive ? '600' : '400' }}>
                     {getTopicLabel(topic)}
                     <span style={{ 
@@ -136,7 +173,7 @@ const ChannelList = ({ onOpenModal }) => {
                       {topic.description}
                     </span>
                   )}
-                </div>
+                </button>
 
                 <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                   {unread > 0 && (

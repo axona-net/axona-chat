@@ -216,10 +216,20 @@ const Modals = ({ activeModal, onClose }) => {
             </p>
             <form onSubmit={handleAddTopic} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.25rem' }}>
+                {/* The label is ASSOCIATED with the field via htmlFor/id. Without
+                    it a screen reader announces an unlabelled textarea, and
+                    clicking the label does nothing. autoFocus puts the caret in
+                    the field when the dialog opens, so nobody has to click into
+                    it before typing (David, council seq 433; Aster, seq 442). */}
+                <label
+                  htmlFor="add-topic-input"
+                  style={{ fontSize: '0.8rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.25rem' }}
+                >
                   Name, link, or descriptor
                 </label>
                 <textarea
+                  id="add-topic-input"
+                  autoFocus
                   placeholder={'retro-gaming\n\n…or https://axona.chat#topic=…\n…or {"region":"eagle","name":"…"}'}
                   value={topicInputRaw}
                   onChange={(e) => setTopicInputRaw(e.target.value)}
