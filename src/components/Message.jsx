@@ -402,7 +402,15 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
               the attested badge is worth anything. */}
           {!badgeClass && selfDeclaredClass && (
             <span
-              title={`This publisher's own message body says "${selfDeclaredClass}". Nothing has attested it — the signer has published no signed class for this key, so treat it as a claim rather than a fact.`}
+              // WHAT ABSENCE OF A BADGE ACTUALLY MEANS (Aster, council seq 474).
+              // My first wording said "the signer has published no signed class
+              // for this key". `!badgeClass` does not establish that. An
+              // attestation this client does not SUPPORT — a class outside the
+              // BADGES table, such as 'service' — also produces no badge, and a
+              // class absent locally may simply not have resolved rather than
+              // never have been published. The honest statement is about what
+              // is available HERE.
+              title={`This publisher's own message body says "${selfDeclaredClass}". No supported signed-class attestation is available to this client, so this label comes from the message body — a claim, not a fact. A signed class would authenticate who declared it, not that it is true.`}
               style={{
                 fontSize: '0.6rem',
                 padding: '0px 5px',
