@@ -1,5 +1,6 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import JsonView from './JsonView.jsx';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { useChatStore } from '../stores/useChatStore.js';
@@ -11,12 +12,26 @@ import { extractUrls, isImageUrl, isYouTubeUrl, isAxonaNameUrl } from '../servic
 
 // Long-message panel height: comfortably smaller than the viewport so a
 // single message can never dominate the list.
-const PANEL_H = Math.min(360, Math.round(window.innerHeight * 0.45));
+// COMPUTED ON USE, NEVER ONCE AT MODULE LOAD.
+//
+// This was `const PANEL_H = Math.min(360, Math.round(window.innerHeight * 0.45))`
+// evaluated at import. `window.innerHeight` is 0 when a module is imported into
+// a view that has not been laid out yet — a background tab, a hidden pane, a
+// freshly created window. PANEL_H then froze at 0 FOR THE LIFE OF THE PAGE, and
+// since a long message renders inside `maxHeight: ${PANEL_H}px`, every long
+// message collapsed to a ZERO-HEIGHT PANEL. The message tile still drew its
+// header and its Copy/Reply row, so it looked like a message with no body
+// rather than like a bug: content SILENTLY UNREACHABLE, with no error anywhere.
+//
+// Found 2026-09-28 in the browser pane, whose tab is created before layout.
+// The floor keeps the panel usable even if innerHeight is briefly small, and
+// the fallback covers innerHeight being 0 or undefined outright.
+const panelH    = () => Math.max(180, Math.min(360, Math.round((window.innerHeight || 800) * 0.45)));
 // A message only a little over the panel height isn't worth capping.
 const PANEL_TOL = 60;
 // How far the arrow buttons advance per press — most of a panel, with overlap
 // so no line is ever skipped across a step.
-const ARROW_STEP = Math.round(PANEL_H * 0.8);
+const arrowStep = () => Math.round(panelH() * 0.8);
 // A FINGER never arms the panel (Aster, CHANGES-REQUIRED b0c204e and 8d37e65).
 // A tap has no mouse-leave to disarm it, so arming on touch re-creates the
 // #405 scroll trap permanently — swipes over the tile would scroll the inner
@@ -116,7 +131,7 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
     const content = contentRef.current;
     if (!content) return;
     const measure = () => {
-      setIsLong(content.scrollHeight > PANEL_H + PANEL_TOL);
+      setIsLong(content.scrollHeight > panelH() + PANEL_TOL);
       updateEdges();
     };
     measure();
@@ -161,7 +176,7 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
   // scrolls, so a step needs no live scroll container — and on touch, arming
   // from an arrow tap would stick (nothing disarms without a mouse).
   const scrollStep = (dir) => {
-    panelRef.current?.scrollBy({ top: dir * ARROW_STEP, behavior: 'smooth' });
+    panelRef.current?.scrollBy({ top: dir * arrowStep(), behavior: 'smooth' });
   };
 
   // Resolve the sender's signed author-class on demand (cached in the store, one
@@ -192,6 +207,26 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
   const badgeClass = BADGES[resolvedClass] ? resolvedClass : null;
 
   const isOwn = currentHandle && signerPubkey === currentHandle.authorId;
+
+  // The structured half of an instrument payload, when there is one. Accepts an
+  // OBJECT in `data` (what axona.track sends) and otherwise tries the body text
+  // as JSON — a publisher that sends only a JSON string still gets a tree.
+  // Arrays and objects qualify; a bare number or string does not, because a tree
+  // of one primitive is just the text again. Parsing is wrapped: a body that
+  // merely LOOKS like JSON must not throw inside a render.
+  const structuredPayload = (() => {
+    const d = payload.data;
+    if (d !== null && typeof d === 'object') return d;
+    const t = payload.text;
+    if (typeof t !== 'string') return null;
+    const s = t.trim();
+    if (!(s.startsWith('{') || s.startsWith('['))) return null;
+    if (s.length > 64 * 1024) return null;       // do not parse an unbounded body
+    try {
+      const parsed = JSON.parse(s);
+      return parsed !== null && typeof parsed === 'object' ? parsed : null;
+    } catch { return null; }
+  })();
 
   // DATE + time, never time alone (user-reported 2026-07-25). A time-only stamp is
   // actively misleading on this network: replayed history arrives interleaved with
@@ -399,7 +434,7 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
           ref={panelRef}
           onScroll={updateEdges}
           style={isLong ? {
-            maxHeight: `${PANEL_H}px`,
+            maxHeight: `${panelH()}px`,
             overflowY: armed ? 'auto' : 'hidden',
             // Contain ONLY while armed. Unarmed it must be 'auto': some
             // engines treat an overflow:hidden box as a scroll container,
@@ -422,6 +457,15 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
             fontSize: '0.9rem', lineHeight: '1.4', wordBreak: 'break-word', color: 'var(--color-text)'
           }}
         >
+          {/* A STRUCTURED PAYLOAD RENDERS AS STRUCTURE, not as a wall of braces.
+              Instrument publishers (axona.track) send a `data` object beside the
+              human-readable `text`; when it is there, show the tree — collapsible,
+              budgeted, and rendered as TEXT. The markdown path still runs for the
+              `text`, so a reader gets the summary and the detail rather than one
+              or the other. David, council seq 433. */}
+          {structuredPayload && (
+            <JsonView value={structuredPayload} title="STRUCTURED PAYLOAD" />
+          )}
           <ReactMarkdown
             // GFM: tables, strikethrough, task lists, autolinks — a pasted
             // markdown document must render whole, not a subset (§7.2).
