@@ -89,6 +89,18 @@ describe('Message decides when a payload is structured', () => {
     expect(/<ReactMarkdown/.test(msg)).toBe(true);
   });
 
+  // SUMMARY BEFORE DETAIL (David, council seq 490). This shipped backwards: the
+  // tree rendered above the prose, so a reader met a hundred rows of JSON before
+  // the one line saying what happened. Presence alone cannot catch that — both
+  // elements were present the whole time — so the assertion is on ORDER.
+  it('the human-readable text renders ABOVE the structured tree', () => {
+    const md   = msg.indexOf('<ReactMarkdown');
+    const tree = msg.indexOf('{structuredPayload && (');
+    expect(md).toBeGreaterThan(-1);
+    expect(tree).toBeGreaterThan(-1);
+    expect(md).toBeLessThan(tree);
+  });
+
   // react-markdown escapes raw HTML unless rehype-raw is added. If that ever
   // changes, every message body becomes an injection surface, not just JSON.
   it('raw-HTML markdown is NOT enabled', () => {

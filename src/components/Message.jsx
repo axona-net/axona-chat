@@ -553,15 +553,11 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
             fontSize: '0.9rem', lineHeight: '1.4', wordBreak: 'break-word', color: 'var(--color-text)'
           }}
         >
-          {/* A STRUCTURED PAYLOAD RENDERS AS STRUCTURE, not as a wall of braces.
-              Instrument publishers (axona.track) send a `data` object beside the
-              human-readable `text`; when it is there, show the tree — collapsible,
-              budgeted, and rendered as TEXT. The markdown path still runs for the
-              `text`, so a reader gets the summary and the detail rather than one
-              or the other. David, council seq 433. */}
-          {structuredPayload && (
-            <JsonView value={structuredPayload} title="STRUCTURED PAYLOAD" />
-          )}
+          {/* SUMMARY FIRST, THEN DETAIL. David, council seq 490: the note saying
+              what happened in human terms belongs at the TOP. It shipped the
+              other way round — the tree rendered above the prose, so a reader
+              met a hundred rows of JSON before the one line explaining them.
+              The markdown path runs first now; the tree follows it. */}
           <ReactMarkdown
             // GFM: tables, strikethrough, task lists, autolinks — a pasted
             // markdown document must render whole, not a subset (§7.2).
@@ -592,6 +588,15 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
           >
             {displayText}
           </ReactMarkdown>
+          {/* A STRUCTURED PAYLOAD RENDERS AS STRUCTURE, not as a wall of braces.
+              Instrument publishers (axona.track) send a `data` object beside the
+              human-readable `text`; when it is there, show the tree — collapsible,
+              budgeted, and rendered as TEXT. Both paths run, so a reader gets the
+              summary and the detail rather than one or the other. David, council
+              seq 433; ordered summary-first at seq 490. */}
+          {structuredPayload && (
+            <JsonView value={structuredPayload} title="STRUCTURED PAYLOAD" />
+          )}
           {renderEmbeds(displayText)}
         </div>
         </div>
