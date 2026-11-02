@@ -23,6 +23,20 @@ const RECOVER_AFTER_MS = 25_000;
 // hot-loop full reconnects.
 const RETRY_INITIAL_MS = 10_000;
 const RETRY_MAX_MS = 60_000;
+// Captured live 2026-11-01 20:26Z (Chrome on the M4, chat 0.101.0): the tab
+// showed its last message and never moved again, while a Firefox tab beside it
+// on the same mesh stayed live. The watchdog had fired once, the rebuild's
+// connect() THREW (kernel >= 4.61.2 rejects with MESH_UNREACHABLE when no live
+// WebRTC bind forms inside ready.timeoutMs — it does not resolve {ready:false}
+// as the comments here once assumed), init's catch left no peer behind, and
+// every later tick returned on `!currentPeer`. One thrown rebuild, then
+// permanent deafness until reload. Chrome produces that thrown rebuild far
+// more readily than Firefox: a tab hidden for 5+ minutes gets its timers
+// throttled to one wakeup a minute, so a tick gap exceeds SLEEP_GAP_MS on its
+// own, and the kernel's reconnect timers inside the 8 s connect deadline are
+// throttled the same way. Since 0.102.0 a missing session is itself a
+// watchdog condition: the tick keeps retrying on the same backoff, and a
+// visibility/resume event retries at once.
 
 export const PeerProvider = ({ children }) => {
   const { bridgeUrl } = useNetwork();
@@ -44,6 +58,7 @@ export const PeerProvider = ({ children }) => {
     let retryDelayMs = RETRY_INITIAL_MS;
     let nextRetryAt = 0;
     let currentPeer = null;      // the live peer the tick health-checks
+    let initInFlight = false;    // init() running (first load or rebuild) — the tick must not start another
 
     // First run only: wait for onboarding to finish so the connection can
     // use the location the user just granted (or explicitly skipped).
@@ -70,6 +85,7 @@ export const PeerProvider = ({ children }) => {
     };
 
     const init = async () => {
+      initInFlight = true;
       setStatus({ ready: false, peers: 0, ms: 0, reason: 'connecting' });
       try {
         await waitForOnboarding();
@@ -138,11 +154,12 @@ export const PeerProvider = ({ children }) => {
         // Fresh connection: reset the zero-peer stopwatch, but NOT
         // everConnected — that flag means "this SESSION was ever connected",
         // and it must survive rebuilds. Resetting it here was the retry
-        // killer Aster found (CHANGES-REQUIRED f0a9f88): connect() RESOLVES
-        // with {ready:false, peers:0} on its timeout rather than rejecting,
-        // so a failed rebuild reset the flag, every later tick bailed on the
-        // !everConnected guard, and the watchdog never fired again. One
-        // attempt, then permanent deafness — the exact disease it treats.
+        // killer Aster found (CHANGES-REQUIRED f0a9f88). At that time
+        // connect() resolved {ready:false, peers:0} on its timeout; since
+        // kernel 4.61.2 it REJECTS instead (MESH_UNREACHABLE), so on a failed
+        // rebuild this line is never reached, init's catch below runs, and
+        // currentPeer stays null. The tick treats that as a condition to
+        // recover from, not a reason to stop (0.102.0).
         zeroSince = null;
         currentPeer = result.peer;
 
@@ -151,6 +168,10 @@ export const PeerProvider = ({ children }) => {
         if (active) {
           setStatus({ ready: false, peers: 0, ms: 0, reason: err.message || 'connection-failed' });
         }
+        // No retry here on purpose: the tick owns retry timing (backoff via
+        // nextRetryAt), and a visibility/resume event can pull it forward.
+      } finally {
+        initInFlight = false;
       }
     };
 
@@ -177,11 +198,11 @@ export const PeerProvider = ({ children }) => {
         cleanup = null;
         currentPeer = null;
         await init();                      // rebuilds peer + setPeer → re-seats subs
-        // Success means PEERS, not merely a peer object: connect() resolves
-        // with {ready:false, peers:0} on timeout, and a rebuild into an empty
-        // room is a failed attempt that must keep the backoff growing. The
-        // tick keeps retrying because everConnected survives; replay waits
-        // for a session that can actually deliver.
+        // Success means PEERS, not merely a peer object. A rebuild whose
+        // connect() threw leaves currentPeer null (init caught it); a rebuild
+        // into an empty room leaves a peer with 0 peers. Both are failed
+        // attempts that must keep the backoff growing. The tick keeps
+        // retrying either way; replay waits for a session that can deliver.
         const meshPeers = currentPeer?.peers ? currentPeer.peers().length : 0;
         if (meshPeers > 0) {
           retryDelayMs = RETRY_INITIAL_MS; // real recovery re-arms fast retry
@@ -207,7 +228,18 @@ export const PeerProvider = ({ children }) => {
       const now = Date.now();
       const gap = now - lastTickAt;
       lastTickAt = now;
-      if (!currentPeer || recovering) return;
+      if (recovering || initInFlight) return;
+
+      if (!currentPeer) {
+        // No session at all: first connect threw, or a rebuild threw. Before
+        // 0.102.0 this returned unconditionally and the watchdog was dead
+        // from here until reload (the 2026-11-01 Chrome wedge). Keep retrying
+        // on the backoff recover() maintains; a wake from suspend with no
+        // session retries at once — the kernel's own timers slept too.
+        if (gap > SLEEP_GAP_MS) nextRetryAt = 0;
+        if (now >= nextRetryAt) recover('no session after a failed connect');
+        return;
+      }
 
       const peersCount = currentPeer.peers ? currentPeer.peers().length : 0;
       setStatus(prev => ({
@@ -231,10 +263,20 @@ export const PeerProvider = ({ children }) => {
     };
     interval = setInterval(tick, TICK_MS);
 
-    // Coming back to a hidden tab or a returning network is the moment the
-    // wedge becomes user-visible — check immediately instead of within 5s.
-    const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
+    // Coming back to a hidden tab, a resumed (unfrozen) tab, or a returning
+    // network is the moment the wedge becomes user-visible — check
+    // immediately instead of within 5s, and if there is no session, do not
+    // make the user wait out a backoff they cannot see.
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!currentPeer && !recovering && !initInFlight) nextRetryAt = 0;
+      tick();
+    };
     document.addEventListener('visibilitychange', onVisible);
+    // Page Lifecycle API: Chromium freezes hidden tabs under memory pressure
+    // and fires 'resume' when it thaws them; no visibilitychange accompanies
+    // a thaw if the tab was already foregrounded by the click that thawed it.
+    document.addEventListener('resume', onVisible);
     window.addEventListener('online', onVisible);
 
     init();
@@ -243,6 +285,7 @@ export const PeerProvider = ({ children }) => {
       active = false;
       if (interval) clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
+      document.removeEventListener('resume', onVisible);
       window.removeEventListener('online', onVisible);
       if (cleanup) cleanup();
     };
