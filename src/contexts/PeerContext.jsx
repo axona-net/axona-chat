@@ -289,7 +289,11 @@ export const PeerProvider = ({ children }) => {
       if (e && e.persisted) return;
       const p = currentPeer;
       if (!p || typeof p.leave !== 'function') return;
-      try { Promise.resolve(p.leave({ drain: false, notify: true, timeoutMs: 0 })).catch(() => {}); } catch { /* best effort */ }
+      // CB6A-CHAT-1 (Orion 12a4f349): timeoutMs 0 shrank leave()'s notify pause
+      // before transport.stop() to nothing; the kernel default keeps it. The
+      // watchdog must not rebuild a session the page is ending.
+      currentPeer = null;
+      try { Promise.resolve(p.leave({ drain: false, notify: true })).catch(() => {}); } catch { /* best effort */ }
     };
     window.addEventListener('pagehide', onPageHide);
 

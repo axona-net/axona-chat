@@ -28,13 +28,15 @@ beforeEach(() => { connect.mockReset(); localStorage.setItem('axona-onboarded', 
 afterEach(() => { cleanup(); });
 
 describe('6a: pagehide hands off', () => {
-  it('a closing tab calls leave() once, non-draining and notifying', async () => {
+  it('a closing tab calls leave() once, non-draining and notifying with the kernel default notify pause', async () => {
     const s = session(); connect.mockResolvedValue(s);
     await act(async () => { render(<PeerProvider><div /></PeerProvider>); });
     await act(async () => { await Promise.resolve(); });
     pagehide(false);
     expect(s.peer.leave).toHaveBeenCalledTimes(1);
-    expect(s.peer.leave).toHaveBeenCalledWith({ drain: false, notify: true, timeoutMs: 0 });
+    expect(s.peer.leave).toHaveBeenCalledWith({ drain: false, notify: true });
+    pagehide(false);
+    expect(s.peer.leave).toHaveBeenCalledTimes(1);   // the session is released once; a second pagehide finds none
   });
   it('a back-forward-cache pagehide (persisted) keeps the session', async () => {
     const s = session(); connect.mockResolvedValue(s);
