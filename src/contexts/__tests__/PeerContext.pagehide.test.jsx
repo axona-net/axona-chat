@@ -45,6 +45,22 @@ describe('6a: pagehide hands off', () => {
     pagehide(true);
     expect(s.peer.leave).not.toHaveBeenCalled();
   });
+  it('CB6A-CHAT-2: after pagehide the watchdog neither disconnects the leaving peer nor dials again', async () => {
+    vi.useFakeTimers();
+    try {
+      const s = session(); connect.mockResolvedValue(s);
+      let r; await act(async () => { r = render(<PeerProvider><div /></PeerProvider>); });
+      await act(async () => { await Promise.resolve(); });
+      const dials = connect.mock.calls.length;
+      pagehide(false);
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+      expect(s.peer.leave).toHaveBeenCalledTimes(1);
+      expect(s.disconnect).not.toHaveBeenCalled();
+      expect(connect.mock.calls.length).toBe(dials);
+      r.unmount();
+      expect(s.disconnect).not.toHaveBeenCalled();   // unmount does not tear down the peer that is leaving
+    } finally { vi.useRealTimers(); }
+  });
   it('after unmount the listener is gone', async () => {
     const s = session(); connect.mockResolvedValue(s);
     let r; await act(async () => { r = render(<PeerProvider><div /></PeerProvider>); });

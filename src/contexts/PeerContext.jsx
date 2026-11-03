@@ -290,9 +290,15 @@ export const PeerProvider = ({ children }) => {
       const p = currentPeer;
       if (!p || typeof p.leave !== 'function') return;
       // CB6A-CHAT-1 (Orion 12a4f349): timeoutMs 0 shrank leave()'s notify pause
-      // before transport.stop() to nothing; the kernel default keeps it. The
-      // watchdog must not rebuild a session the page is ending.
+      // before transport.stop() to nothing; the kernel default keeps it.
+      // CB6A-CHAT-2 (Orion a7e17f28): the watchdog must not rebuild a session
+      // the page is ending. currentPeer = null alone woke its no-session branch
+      // (0.102.0), which disconnected the leaving peer mid-handoff and dialled a
+      // new one. Disarm the watchdog and drop the unmount teardown first.
+      active = false;
+      if (interval) { clearInterval(interval); interval = null; }
       currentPeer = null;
+      cleanup = null;
       try { Promise.resolve(p.leave({ drain: false, notify: true })).catch(() => {}); } catch { /* best effort */ }
     };
     window.addEventListener('pagehide', onPageHide);
