@@ -279,6 +279,20 @@ export const PeerProvider = ({ children }) => {
     document.addEventListener('resume', onVisible);
     window.addEventListener('online', onVisible);
 
+    // 6a (Closer-Born v0.6; David 2026-11-03 "go ahead with 6a"): a closing
+    // tab hands off what it holds. Every node may hold a root or a backup, and
+    // peer.leave() hands both to the next closest node. BEST EFFORT: the
+    // handoff awaits lookups, and a page being torn down may never run them;
+    // Chrome also freezes hidden tabs. A page entering the back-forward cache
+    // (persisted) may come back, so it keeps its session.
+    const onPageHide = (e) => {
+      if (e && e.persisted) return;
+      const p = currentPeer;
+      if (!p || typeof p.leave !== 'function') return;
+      try { Promise.resolve(p.leave({ drain: false, notify: true, timeoutMs: 0 })).catch(() => {}); } catch { /* best effort */ }
+    };
+    window.addEventListener('pagehide', onPageHide);
+
     init();
 
     return () => {
@@ -287,6 +301,7 @@ export const PeerProvider = ({ children }) => {
       document.removeEventListener('visibilitychange', onVisible);
       document.removeEventListener('resume', onVisible);
       window.removeEventListener('online', onVisible);
+      window.removeEventListener('pagehide', onPageHide);
       if (cleanup) cleanup();
     };
   }, [bridgeUrl]); // Reconnect ONLY on bridge change — never on handle switch
