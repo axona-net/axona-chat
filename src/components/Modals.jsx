@@ -549,10 +549,13 @@ const Modals = ({ activeModal, onClose }) => {
         {activeModal === 'share' && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.8rem', textAlign: 'center' }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--color-primary-light)' }}>
-              Share Private Connection
+              Share an Invite Link
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: 0 }}>
-              Scan this QR code or copy the link below to invite a friend into a secure, end-to-end symmetrically encrypted private channel.
+              Scan this QR code or copy the link below to invite someone into a channel that only people with the link can read.
+            </p>
+            <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: 0 }}>
+              The key travels in the link itself, so anyone who gets the link can read and post. This encryption has not been independently reviewed. Do not use it for anything confidential.
             </p>
             
             <div style={{ background: '#fff', padding: '0.5rem', borderRadius: '8px', display: 'flex', margin: '0.5rem 0' }}>

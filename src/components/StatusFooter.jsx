@@ -211,7 +211,7 @@ const StatusFooter = ({ onOpenModal }) => {
             cursor: 'pointer',
             color: 'var(--color-text)'
           }}
-          title="Start a private conversation: shows a QR code and link that open an encrypted one-to-one channel with whoever uses it"
+          title="Share an invite link: shows a QR code and link to a channel that anyone holding the link can read and post in. Not reviewed for confidential use"
         >
           🔗{!isMobile && ' QR Link'}
         </button>
