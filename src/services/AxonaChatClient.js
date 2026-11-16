@@ -417,6 +417,11 @@ class AxonaChatClient {
   }
 
   async publish(descriptor, text, options = {}) {
+    // Reject removed private intent, even when empty or inherited; never
+    // silently turn a caller's private reply into a public message.
+    if (['encryptToRecipient', 'privateTopic', 'privateKey'].some(key => key in Object(options))) {
+      throw new Error('Private Reply is unavailable. No message was sent.');
+    }
     if (!this.peer) throw new Error('Peer not connected.');
 
     const store = useChatStore.getState();
