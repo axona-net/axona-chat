@@ -27,7 +27,7 @@ const ChannelList = ({ onOpenModal }) => {
   const getTopicLabel = (topic) => {
     const isOwner = topic.owner && useChatStore.getState().currentHandle?.authorId === topic.owner;
     const name = topic.privateKey && topic.description
-      ? `🔒 ${topic.description.replace('Private chat with ', '')}`
+      ? `🔗 ${topic.description.replace('Private chat with ', '')}`
       : `#${topic.name}`;
 
     return (
@@ -217,12 +217,12 @@ const ChannelList = ({ onOpenModal }) => {
                       textTransform: 'uppercase',
                       fontWeight: '600'
                     }}>
-                      {topic.mode || 'open'}
+                      {topic.mode === 'encrypted' ? 'invite link' : (topic.mode || 'open')}
                     </span>
                   </div>
                   {topic.description && (
                     <span style={{ fontSize: '0.7rem', color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
-                      {topic.description}
+                      {topic.description.startsWith('Private chat with ') ? `Invite link: ${topic.description.replace('Private chat with ', '')}` : topic.description}
                     </span>
                   )}
                 </button>
@@ -266,7 +266,7 @@ const ChannelList = ({ onOpenModal }) => {
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-primary-light)'}
                       onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-muted)'}
-                      title="Rename this private channel — the name is just for you, the other person keeps their own"
+                      title="Rename this invite-link channel — the name is just for you, the other person keeps their own"
                     >
                       ✏️
                     </button>

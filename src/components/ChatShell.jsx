@@ -96,7 +96,7 @@ const ChatShell = () => {
 
       // Prompt to name the connection locally
       setTimeout(() => {
-        const localName = window.prompt("You received a private channel invitation! Please enter a name for this connection:");
+        const localName = window.prompt("You opened an invite link. Anyone with the link can read and post in this channel. Enter a name for it:");
         if (localName && localName.trim()) {
           const descriptor = {
             region: 'eagle',

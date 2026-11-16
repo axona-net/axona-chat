@@ -473,21 +473,6 @@ const Message = ({ envelope, activeTopic, onReply, level = 0 }) => {
             </span>
           )}
 
-          {payload.isEncrypted && (
-            <span style={{
-              fontSize: '0.6rem',
-              padding: '1px 5px',
-              borderRadius: '10px',
-              background: 'var(--color-success-bg)',
-              color: 'var(--color-success)',
-              fontWeight: '600',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '2px'
-            }}>
-              🔒 PRIVATE
-            </span>
-          )}
 
           <span style={{ fontSize: '0.65rem', color: 'var(--color-muted)' }}>
             {signerPubkey?.slice(0, 10)}...
