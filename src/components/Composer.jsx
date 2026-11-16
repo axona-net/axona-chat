@@ -2,11 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
-import CryptoJS from 'crypto-js';
 import { useChatStore } from '../stores/useChatStore.js';
 import { useHandle } from '../contexts/HandleContext.jsx';
 import AxonaChatClient from '../services/AxonaChatClient.js';
-import CryptoService from '../services/CryptoService.js';
 import { loadHistory, appendHistory, stepHistory, historyAt } from '../services/messageHistory.js';
 
 // Simple toolbar button
@@ -31,7 +29,7 @@ const ToolbarButton = ({ onClick, label, active = false }) => (
   </button>
 );
 
-const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenModal }) => {
+const Composer = ({ replyTarget, clearReplyTargets, onOpenModal }) => {
   const { activeTopic } = useChatStore();
   const { declaration, activeHandle } = useHandle();
 
@@ -184,23 +182,13 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
         options.replyTo = replyTarget.msgId;
       }
 
-      if (privateReplyTarget) {
-        // Alice encrypts to Bob's Author ID (privateReplyTarget.signerPubkey)
-        const privateTopic = CryptoService.generatePrivateTopic();
-        const privateKey = CryptoJS.lib.WordArray.random(16).toString(); // Generate AES session key
-        
-        options.encryptToRecipient = privateReplyTarget.signerPubkey;
-        options.privateTopic = privateTopic;
-        options.privateKey = privateKey;
-      }
 
       // Publish using AxonaChatClient
       await AxonaChatClient.publish(activeTopic, textToSend, options);
 
       // Recall buffer: only AFTER the publish resolves, so a failed send does not
-      // leave a phantom in history. Private replies are excluded inside
-      // appendHistory — their plaintext must not be written to disk.
-      setHistory(appendHistory(plainText, { private: !!privateReplyTarget }));
+      // leave a phantom in history.
+      setHistory(appendHistory(plainText));
       setHistIndex(-1);
       draftRef.current = '';
 
@@ -378,14 +366,14 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
         borderTop: '1px solid var(--border-color)',
         position: 'relative'
       }}>
-        {/* Target status bar (Reply / Private Reply Indicator) */}
-        {(replyTarget || privateReplyTarget) && (
+        {/* Target status bar (Reply indicator) */}
+        {replyTarget && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: privateReplyTarget ? 'var(--color-success-bg)' : 'rgba(52, 152, 219, 0.08)',
-            borderLeft: privateReplyTarget ? '3px solid var(--color-success)' : '3px solid #3498db',
+            background: 'rgba(52, 152, 219, 0.08)',
+            borderLeft: '3px solid #3498db',
             padding: '0.35rem 0.6rem',
             borderRadius: '4px',
             fontSize: '0.75rem',
@@ -394,11 +382,6 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
             <div>
               {replyTarget && (
                 <span>Replying to <b>{replyTarget.message?.handle || 'Anonymous'}</b>: "{replyTarget.message?.text?.slice(0, 30)}..."</span>
-              )}
-              {privateReplyTarget && (
-                <span style={{ color: '#2ecc71' }}>
-                  🔒 <b>Private Reply</b> to {privateReplyTarget.message?.handle || 'Anonymous'} (ciphertext only readable by them)
-                </span>
               )}
             </div>
             <button 
@@ -570,14 +553,14 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
               </button>
             </div>
 
-            {/* Target status bar (Reply / Private Reply Indicator) */}
-            {(replyTarget || privateReplyTarget) && (
+            {/* Target status bar (Reply indicator) */}
+            {replyTarget && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                background: privateReplyTarget ? 'var(--color-success-bg)' : 'rgba(52, 152, 219, 0.08)',
-                borderLeft: privateReplyTarget ? '3px solid var(--color-success)' : '3px solid #3498db',
+                background: 'rgba(52, 152, 219, 0.08)',
+                borderLeft: '3px solid #3498db',
                 padding: '0.35rem 0.6rem',
                 borderRadius: '4px',
                 fontSize: '0.75rem'
@@ -585,11 +568,6 @@ const Composer = ({ replyTarget, privateReplyTarget, clearReplyTargets, onOpenMo
                 <div>
                   {replyTarget && (
                     <span>Replying to <b>{replyTarget.message?.handle || 'Anonymous'}</b>: "{replyTarget.message?.text?.slice(0, 30)}..."</span>
-                  )}
-                  {privateReplyTarget && (
-                    <span style={{ color: '#2ecc71' }}>
-                      🔒 <b>Private Reply</b> to {privateReplyTarget.message?.handle || 'Anonymous'} (ciphertext only readable by them)
-                    </span>
                   )}
                 </div>
                 <button 

@@ -75,7 +75,7 @@ const BADGES = {
                 hint: 'This author declared itself an automatic data source, signed with its own key. It reports readings rather than making claims, so read it with its calibration and failure modes in mind. The signature shows who declared it — not that the readings are right.' },
 };
 
-const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) => {
+const Message = ({ envelope, activeTopic, onReply, level = 0 }) => {
   const { msgId, signerPubkey, ts } = envelope;
   const payload = envelope.message;
   const { currentHandle } = useChatStore();
@@ -677,18 +677,6 @@ const Message = ({ envelope, activeTopic, onReply, onPrivateReply, level = 0 }) 
           Reply
         </span>
 
-        {/* Can private-reply if not own message */}
-        {!isOwn && (
-          <span
-            onClick={() => onPrivateReply(envelope)}
-            title="Reply privately — only this message's author can read it, and it can open a private channel between you"
-            style={{ color: 'var(--color-muted)', cursor: 'pointer', transition: 'color 0.2s' }}
-            onMouseEnter={(e) => e.target.style.color = 'var(--color-success)'}
-            onMouseLeave={(e) => e.target.style.color = 'var(--color-muted)'}
-          >
-            Private Reply
-          </span>
-        )}
 
         {/* Retraction option (Kill own message) */}
         {isOwn && (

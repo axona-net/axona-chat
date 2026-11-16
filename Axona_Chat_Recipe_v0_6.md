@@ -327,6 +327,8 @@ Opening the app through such a link: the client derives the session key from the
 
 ### 9.2 Private encrypted replies (in-band handoff)
 
+> **REMOVED from the application in 0.109.0 (2026-11-16).** The shipped implementation keyed the envelope on the recipient's public Author ID, so any reader of the topic could open it. That broke this document's own rule: the application must never present a security property it does not have. The button, the send path and the continuation are gone. A client that receives an `encrypted-reply` payload renders nothing. Private communication will return as a separate design with real endpoint encryption. The text below is kept as the record of the earlier flow and is NOT a specification to rebuild from.
+
 From any public-topic message not your own, **Private Reply** composes a message visible only to that author: the payload carries ciphertext addressed to the recipient plus an optional handoff (a fresh random private topic and key) that, when present, bootstraps a persistent private channel exactly like §9.1's. The recipient's client decrypts, renders the reply inline with a private badge, and auto-joins the handed-off channel.
 
 ### 9.3 Invisible to everyone else — normative

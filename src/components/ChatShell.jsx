@@ -18,7 +18,6 @@ const ChatShell = () => {
 
   const [activeModal, setActiveModal] = useState(null);
   const [replyTarget, setReplyTarget] = useState(null);
-  const [privateReplyTarget, setPrivateReplyTarget] = useState(null);
   
   // Mobile layout is a sliding topic drawer over the chat: it OPENS on first
   // load (picking a topic is the first decision), slides aside when a topic is
@@ -127,18 +126,11 @@ const ChatShell = () => {
   };
 
   const handleSetReply = (env) => {
-    setPrivateReplyTarget(null);
     setReplyTarget(env);
-  };
-
-  const handleSetPrivateReply = (env) => {
-    setReplyTarget(null);
-    setPrivateReplyTarget(env);
   };
 
   const clearReplyTargets = () => {
     setReplyTarget(null);
-    setPrivateReplyTarget(null);
   };
 
   // Render responsive layout
@@ -220,13 +212,11 @@ const ChatShell = () => {
             {streamMode ? (
               <StreamPane
                 setReplyTarget={handleSetReply}
-                setPrivateReplyTarget={handleSetPrivateReply}
               />
             ) : (
               <MessagePane
                 onOpenModal={handleOpenModal}
                 setReplyTarget={handleSetReply}
-                setPrivateReplyTarget={handleSetPrivateReply}
               />
             )}
           </div>
@@ -237,7 +227,6 @@ const ChatShell = () => {
           {!streamMode && (
             <Composer
               replyTarget={replyTarget}
-              privateReplyTarget={privateReplyTarget}
               clearReplyTargets={clearReplyTargets}
               onOpenModal={handleOpenModal}
             />

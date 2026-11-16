@@ -1,12 +1,13 @@
 import CryptoJS from 'crypto-js';
 
 /**
- * CryptoService manages asymmetric and symmetric encryption for private messages
- * and private continuation channels.
+ * CryptoService holds the symmetric helpers for invite-link channels (the key
+ * travels in the link). There is NO encrypt-to-author here: the earlier one
+ * keyed on the recipient's public Author ID and was removed in 0.109.0.
  */
 class CryptoService {
   /**
-   * Generates a random topic descriptor name for a private continuation.
+   * Generates a random topic name for an invite-link channel.
    */
   generatePrivateTopic() {
     const array = new Uint8Array(16);
@@ -20,61 +21,6 @@ class CryptoService {
    */
   deriveSessionKey(seed) {
     return CryptoJS.SHA256(seed).toString(CryptoJS.enc.Hex);
-  }
-
-  /**
-   * Simulates asymmetric encryption of a session key to a recipient's Author ID.
-   * In a real app, this uses ECIES or X25519 ECDH. Here we simulate it
-   * by encrypting using a key that can be decrypted by the recipient.
-   */
-  encryptToAuthor(plaintext, recipientAuthorId, senderAuthorId) {
-    // Generate a random key for symmetric encryption of the plaintext
-    const sessionKey = CryptoJS.lib.WordArray.random(16).toString();
-    const encryptedPayload = CryptoJS.AES.encrypt(plaintext, sessionKey).toString();
-
-    // To simulate asymmetric encryption of the sessionKey to the recipientAuthorId:
-    // We create an envelope that stores the recipientAuthorId and the encrypted key.
-    // In our client, only the handle with the matching authorId can decrypt it.
-    const keyEnvelope = {
-      recipient: recipientAuthorId,
-      sender: senderAuthorId,
-      // For simulation: we XOR the sessionKey with a key derived from recipientAuthorId
-      // In a real app, this would be encrypted with Bob's public key.
-      encryptedKey: CryptoJS.AES.encrypt(sessionKey, recipientAuthorId).toString()
-    };
-
-    return JSON.stringify({
-      keyEnvelope,
-      encryptedPayload
-    });
-  }
-
-  /**
-   * Decrypts an envelope meant for the recipient.
-   * Returns plaintext if successful, or null if the reader is not the intended recipient.
-   */
-  decryptAsRecipient(encryptedString, recipientAuthorId) {
-    try {
-      const { keyEnvelope, encryptedPayload } = JSON.parse(encryptedString);
-      if (!keyEnvelope || !encryptedPayload) return null;
-
-      // Only the recipient can decrypt
-      if (keyEnvelope.recipient !== recipientAuthorId) {
-        return null; // Not the recipient
-      }
-
-      // Decrypt the session key using the recipient's authorId
-      const keyBytes = CryptoJS.AES.decrypt(keyEnvelope.encryptedKey, recipientAuthorId);
-      const sessionKey = keyBytes.toString(CryptoJS.enc.Utf8);
-      if (!sessionKey) return null;
-
-      // Decrypt the actual payload
-      const payloadBytes = CryptoJS.AES.decrypt(encryptedPayload, sessionKey);
-      return payloadBytes.toString(CryptoJS.enc.Utf8);
-    } catch (e) {
-      console.warn('Failed to decrypt as recipient:', e);
-      return null;
-    }
   }
 
   /**

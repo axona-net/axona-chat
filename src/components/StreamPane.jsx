@@ -23,7 +23,7 @@ import Message from './Message.jsx';
 // the user-controlled half of "engaging" — it is their attention and the
 // control over it stays with them (Aster 437, seconded seq 440).
 
-const StreamPane = ({ setReplyTarget, setPrivateReplyTarget }) => {
+const StreamPane = ({ setReplyTarget }) => {
   const subscribedTopics = useChatStore(s => s.subscribedTopics);
   const messages = useChatStore(s => s.messages);
   const lastRead = useChatStore(s => s.lastRead);
@@ -151,7 +151,6 @@ const StreamPane = ({ setReplyTarget, setPrivateReplyTarget }) => {
                 envelope={env}
                 activeTopic={topic}
                 onReply={(e) => setReplyTarget?.(e)}
-                onPrivateReply={(e) => setPrivateReplyTarget?.(e)}
               />
             </div>
           );

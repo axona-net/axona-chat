@@ -35,24 +35,10 @@ describe('CryptoService', () => {
     expect(badDecrypted).toBeNull();
   });
 
-  it('should simulate asymmetric encryption and decryption to an author ID', () => {
-    const plaintext = 'Secret private message payload';
-    const aliceId = 'alice-author-id-123';
-    const bobId = 'bob-author-id-456';
-
-    const envelope = CryptoService.encryptToAuthor(plaintext, bobId, aliceId);
-    expect(envelope).toBeTypeOf('string');
-
-    // Bob (recipient) can decrypt it
-    const bobDecrypted = CryptoService.decryptAsRecipient(envelope, bobId);
-    expect(bobDecrypted).toBe(plaintext);
-
-    // Alice (sender) cannot decrypt it (only Bob can)
-    const aliceDecrypted = CryptoService.decryptAsRecipient(envelope, aliceId);
-    expect(aliceDecrypted).toBeNull();
-
-    // Random person cannot decrypt it
-    const randomDecrypted = CryptoService.decryptAsRecipient(envelope, 'random-person-id');
-    expect(randomDecrypted).toBeNull();
+  it('has no encrypt-to-author: Private Reply was removed in 0.109.0', () => {
+    // The removed version keyed on the recipient's PUBLIC Author ID, so any
+    // reader of the topic could open it. It must not come back in that shape.
+    expect(CryptoService.encryptToAuthor).toBeUndefined();
+    expect(CryptoService.decryptAsRecipient).toBeUndefined();
   });
 });

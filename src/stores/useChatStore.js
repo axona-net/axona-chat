@@ -148,9 +148,6 @@ export const useChatStore = create((set, get) => {
   // Map of outputTopicId -> array of raw channel envelopes awaiting approval
   moderationQueue: {},
 
-  // Private continuations: map of partnerAuthorId -> { topic, key, messages: [] }
-  privateConversations: {},
-
   // Presence: map of authorId -> { handle, declaration, lastSeen }
   presence: {},
   topicMetrics: {},
@@ -401,31 +398,6 @@ export const useChatStore = create((set, get) => {
     set(state => ({
       authorClasses: { ...state.authorClasses, [signer]: info }
     }));
-  },
-
-  addPrivateConversation: (partnerId, topic, key) => {
-    set(state => ({
-      privateConversations: {
-        ...state.privateConversations,
-        [partnerId]: { topic, key, messages: [] }
-      }
-    }));
-  },
-
-  addPrivateMessage: (partnerId, msg) => {
-    set(state => {
-      const conv = state.privateConversations[partnerId];
-      if (!conv) return {};
-      return {
-        privateConversations: {
-          ...state.privateConversations,
-          [partnerId]: {
-            ...conv,
-            messages: [...conv.messages, msg]
-          }
-        }
-      };
-    });
   }
   };
 });

@@ -323,34 +323,11 @@ class AxonaChatClient {
           return;
         }
 
-        // Private Encrypted Reply delivery
+        // 'encrypted-reply' was the payload of the removed Private Reply feature.
+        // Its key was derived from the recipient's PUBLIC Author ID, so it was never
+        // private. An old client may still send one. Render nothing.
         if (processedPayload && processedPayload.kind === 'encrypted-reply') {
-          const currentHandle = useChatStore.getState().currentHandle;
-          if (currentHandle) {
-            const decrypted = CryptoService.decryptAsRecipient(processedPayload.ciphertext, currentHandle.authorId);
-            if (decrypted) {
-              const reply = JSON.parse(decrypted);
-              this.resolveAuthorClass(senderId);
-              // Store as decrypted message
-              useChatStore.getState().addEnvelope(getTopicId(descriptor), {
-                ...envelope,
-                message: {
-                  ...processedPayload,
-                  isEncrypted: true,
-                  decryptedText: reply.text,
-                  privateTopic: reply.privateTopic,
-                  privateKey: reply.privateKey
-                }
-              });
-
-              // If a private continuation topic was handed off, subscribe to it!
-              if (reply.privateTopic && reply.privateKey) {
-                useChatStore.getState().addPrivateConversation(senderId, reply.privateTopic, reply.privateKey);
-                this.subscribeToPrivateContinuation(reply.privateTopic, reply.privateKey, senderId);
-              }
-            }
-          }
-          return; // Hide ciphertext from others entirely
+          return;
         }
 
         // Moderated raw submission delivery
@@ -439,44 +416,6 @@ class AxonaChatClient {
     }
   }
 
-  async subscribeToPrivateContinuation(topicName, key, partnerId) {
-    // Same capture-and-check as subscribeTo: this path awaits sub() and writes
-    // a handle, so it has the identical late-arrival hazard.
-    const peer = this.peer;
-    const gen = this._peerGen;
-    if (!peer) return;
-
-    const descriptor = { region: 'eagle', name: topicName, write: 'open' };
-    const id = await this.getTopicHexId(descriptor);
-
-    if (this.activeSubscriptions.has(id)) return;
-
-    try {
-      const sub = await peer.sub(descriptor, (envelope) => {
-        const payload = envelope.message;
-        if (payload && payload.ciphertext) {
-          const decrypted = CryptoService.decryptSymmetric(payload.ciphertext, key);
-          if (decrypted) {
-            useChatStore.getState().addPrivateMessage(partnerId, {
-              id: envelope.msgId,
-              sender: payload.handle || 'Anonymous',
-              text: decrypted,
-              ts: envelope.ts
-            });
-          }
-        }
-      }, { since: 'all' });
-
-      if (gen !== this._peerGen) {
-        try { sub.stop?.(); } catch { /* already dead */ }
-        return;
-      }
-      this.activeSubscriptions.set(id, sub);
-    } catch (e) {
-      console.error('Failed private continuation sub:', e);
-    }
-  }
-
   async publish(descriptor, text, options = {}) {
     if (!this.peer) throw new Error('Peer not connected.');
 
@@ -508,27 +447,6 @@ class AxonaChatClient {
         authorClass: declaration,
         replyTo: options.replyTo || undefined
       });
-    }
-
-    // 1. Private Encrypted Reply (§9)
-    if (options.encryptToRecipient) {
-      const encryptedText = CryptoService.encryptToAuthor(
-        JSON.stringify({
-          text,
-          privateTopic: options.privateTopic || undefined,
-          privateKey: options.privateKey || undefined
-        }),
-        options.encryptToRecipient,
-        handle.authorId
-      );
-
-      payload = {
-        kind: 'encrypted-reply',
-        handle: handle.name,
-        authorClass: declaration,
-        ciphertext: encryptedText,
-        replyTo: options.replyTo || undefined
-      };
     }
 
     // 2. Moderation Funnel Routing
@@ -592,35 +510,6 @@ class AxonaChatClient {
         console.warn(`[axona-chat] replay failed for ${msgId.slice(0, 10)}…: ${err.message}`);
       }
     }
-  }
-
-  async publishPrivateContinuation(partnerId, text) {
-    if (!this.peer) return;
-
-    const store = useChatStore.getState();
-    const conv = store.privateConversations[partnerId];
-    if (!conv) return;
-
-    const handle = store.currentHandle;
-    const activeAuthor = await this.getActiveAuthor();
-
-    const descriptor = { region: 'eagle', name: conv.topic, write: 'open' };
-    const ciphertext = CryptoService.encryptSymmetric(text, conv.key);
-
-    const payload = {
-      handle: handle ? handle.name : 'Anonymous',
-      ciphertext
-    };
-
-    await this.peer.pub(descriptor, payload, { signWith: activeAuthor });
-
-    // Instantly append local copy for fast feedback
-    useChatStore.getState().addPrivateMessage(partnerId, {
-      id: Math.random().toString(),
-      sender: handle ? handle.name : 'You',
-      text,
-      ts: Date.now()
-    });
   }
 
   async forwardMessage(outputTopicDescriptor, originalEnvelope) {

@@ -6,7 +6,7 @@ import AxonaChatClient from '../services/AxonaChatClient.js';
 import { usePeer } from '../contexts/PeerContext.jsx';
 import { buildTopicLink } from '../services/topicLink.js';
 
-const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => {
+const MessagePane = ({ onOpenModal, setReplyTarget }) => {
   const { activeTopic, activeTopicId, messages, currentHandle, moderationQueue, topicMetrics } = useChatStore();
   const { status } = usePeer();
   const advertisedTopics = useChatStore(s => s.advertisedTopics);
@@ -128,7 +128,6 @@ const MessagePane = ({ onOpenModal, setReplyTarget, setPrivateReplyTarget }) => 
           envelope={node}
           activeTopic={activeTopic}
           onReply={(env) => setReplyTarget(env)}
-          onPrivateReply={(env) => setPrivateReplyTarget(env)}
           level={level}
         />
         {node.children.length > 0 && renderThreadNodes(node.children, level + 1)}
