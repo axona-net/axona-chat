@@ -249,6 +249,10 @@ class AxonaChatClient {
       const isPresence = descriptor.name === this.heartbeatTopic.name;
 
       const sub = await peer.sub(descriptor, (envelope) => {
+        // LAST ARRIVAL (0.116.0): anything delivered on a channel, a message or
+        // a retraction, is this channel being heard. Stamped before any branch
+        // below can return. The two shared topics are not channels.
+        if (!isTicker && !isPresence) useChatStore.getState().noteArrival(getTopicId(descriptor));
         // Send confirmation: our own envelope arriving counts as delivered
         // ONLY while the session has peers. On a zero-peer island the local
         // node roots the topic itself and echoes the publish straight back —

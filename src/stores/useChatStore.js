@@ -151,6 +151,11 @@ export const useChatStore = create((set, get) => {
   // Presence: map of authorId -> { handle, declaration, lastSeen }
   presence: {},
   topicMetrics: {},
+  // WHEN each channel last HEARD anything (0.116.0), keyed like topicMetrics.
+  // Not when its newest message was written: on 2026-11-24 a channel showed a
+  // message stamped that morning and nothing said the app had heard nothing
+  // since. Memory only; a reload starts with no arrivals, which is the truth.
+  lastArrival: {},
 
   // Author-class cache: signerPubkey (Author ID) -> resolved, VERIFIED class from
   // the kernel's signed attestation (peer.getAuthorClass), NOT the in-body string.
@@ -171,6 +176,9 @@ export const useChatStore = create((set, get) => {
   })(),
 
   // Actions
+  noteArrival: (storeId, at = Date.now()) => set((state) => (
+    state.lastArrival[storeId] === at ? state : { lastArrival: { ...state.lastArrival, [storeId]: at } }
+  )),
   updateTopicMetrics: (storeId, metrics) => set((state) => ({
     topicMetrics: {
       ...state.topicMetrics,
@@ -410,4 +418,22 @@ export const useChatStore = create((set, get) => {
 // tests, which reads as "no tests here" rather than "the import failed".
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   window.useChatStore = useChatStore;
+}
+
+// The words shown beside a channel's count for its last arrival. A clock time,
+// not "3 minutes ago": nothing re-renders the header on a timer, and a relative
+// time that does not move is the frozen-number fault the footer once had.
+export function arrivalLabel(at, now = Date.now()) {
+  if (!Number.isFinite(at) || at <= 0) return 'nothing heard yet';
+  const d = new Date(at), n = new Date(now);
+  const pad = (x) => String(x).padStart(2, '0');
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const sameDay = d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+  return sameDay ? `heard ${hm}` : `heard ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`;
+}
+
+// The node id as the footer shows it: the first twelve characters, the length a
+// relay log prints. Anything that is not a hex id shows as nothing.
+export function shortNodeId(id) {
+  return (typeof id === 'string' && /^[0-9a-f]{12,}$/i.test(id)) ? id.slice(0, 12).toLowerCase() : null;
 }

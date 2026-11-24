@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { KERNEL_VERSION } from '@axona/protocol';
-import { useChatStore } from '../stores/useChatStore.js';
+import { useChatStore, shortNodeId } from '../stores/useChatStore.js';
 import { useHandle } from '../contexts/HandleContext.jsx';
 import { usePeer } from '../contexts/PeerContext.jsx';
 import { useNetwork } from '../contexts/NetworkContext.jsx';
@@ -11,7 +11,12 @@ const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '
 
 const StatusFooter = ({ onOpenModal }) => {
   const { handles, activeHandle, setActiveHandleId, declaration, setDeclaration } = useHandle();
-  const { status } = usePeer();
+  const { status, node } = usePeer();
+  const nodeShort = shortNodeId(node?.id);
+  const [copied, setCopied] = useState(false);
+  const copyNodeId = async () => {
+    try { await navigator.clipboard.writeText(node.id); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* no clipboard: the title still shows the whole id */ }
+  };
   const { bridgeUrl } = useNetwork();
   const { theme, toggleTheme } = useChatStore();
   const [showHandlesList, setShowHandlesList] = useState(false);
@@ -81,6 +86,17 @@ const StatusFooter = ({ onOpenModal }) => {
             >
               v{APP_VERSION} · kernel {KERNEL_VERSION}
             </span>
+          )}
+          {/* The node this session IS on the network. A relay log names nodes
+              by these twelve characters. Click copies the whole id. */}
+          {!isMobile && nodeShort && (
+            <button
+              onClick={copyNodeId}
+              title={`This session's node id: ${node.id}\nBuilt ${new Date(node.builtAt).toLocaleTimeString()} · connection built ${node.builds} time${node.builds === 1 ? '' : 's'} since the page loaded\nClick to copy the whole id`}
+              style={{ color: 'var(--color-muted)', fontSize: '0.68rem', fontFamily: 'monospace', whiteSpace: 'nowrap', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+            >
+              {copied ? 'copied' : `node ${nodeShort}`}{node.builds > 1 ? ` · rebuilt ${node.builds - 1}×` : ''}
+            </button>
           )}
         </div>
 

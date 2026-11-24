@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { useChatStore } from '../stores/useChatStore.js';
+import { useChatStore, arrivalLabel } from '../stores/useChatStore.js';
 import { useCompactLayout } from '../hooks/useCompactLayout.js';
 import Message from './Message.jsx';
 import AxonaChatClient from '../services/AxonaChatClient.js';
@@ -7,7 +7,7 @@ import { usePeer } from '../contexts/PeerContext.jsx';
 import { buildTopicLink } from '../services/topicLink.js';
 
 const MessagePane = ({ onOpenModal, setReplyTarget }) => {
-  const { activeTopic, activeTopicId, messages, currentHandle, moderationQueue, topicMetrics } = useChatStore();
+  const { activeTopic, activeTopicId, messages, currentHandle, moderationQueue, topicMetrics, lastArrival } = useChatStore();
   const { status } = usePeer();
   const advertisedTopics = useChatStore(s => s.advertisedTopics);
   const listRef = useRef(null);
@@ -196,6 +196,19 @@ const MessagePane = ({ onOpenModal, setReplyTarget }) => {
                 ? `${topicMetrics[activeTopicId].current_count} messages`
                 : '… messages'
               }
+            </span>
+            <span
+              title="When this session last received anything on this channel. This is the time of ARRIVAL, not the time the newest message was written. If the count rises and this time does not move, the channel is not being fed."
+              style={{
+              fontSize: '0.65rem',
+              padding: '1px 5px',
+              borderRadius: '3px',
+              background: 'var(--color-bg)',
+              color: 'var(--color-muted)',
+              border: '1px solid var(--border-color)',
+              fontWeight: '500'
+            }}>
+              {arrivalLabel(lastArrival[activeTopicId])}
             </span>
           </div>
           <span style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>

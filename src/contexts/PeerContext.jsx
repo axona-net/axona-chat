@@ -41,6 +41,10 @@ const RETRY_MAX_MS = 60_000;
 export const PeerProvider = ({ children }) => {
   const { bridgeUrl } = useNetwork();
   const [peer, setPeer] = useState(null);
+  // WHICH NODE THIS IS (0.116.0). Every rebuild makes a new node with a new id.
+  // On 2026-11-24 the id of a deaf tab was got by pasting a script into the
+  // developer console; a person should be able to read it off the page.
+  const [node, setNode] = useState({ id: null, builtAt: null, builds: 0 });
   const [status, setStatus] = useState({ ready: false, peers: 0, ms: 0, reason: 'connecting' });
   // Dev diagnostic: mesh dial outcomes, surfaced on-screen (see strip below).
   const [meshDiag, setMeshDiag] = useState({ ok: 0, failed: 0 });
@@ -120,6 +124,11 @@ export const PeerProvider = ({ children }) => {
         }
 
         setPeer(result.peer);
+        {
+          let id = null;
+          try { id = result.nodeIdentity?.id ?? result.peer?._nodeIdHex?.() ?? null; } catch { id = null; }
+          setNode((n) => ({ id: typeof id === 'string' ? id.toLowerCase() : null, builtAt: Date.now(), builds: n.builds + 1 }));
+        }
         AxonaChatClient.setPeer(result.peer);
         setStatus(result.status || { ready: true, peers: 1, ms: 0, reason: 'connected' });
 
@@ -317,7 +326,7 @@ export const PeerProvider = ({ children }) => {
   }, [bridgeUrl]); // Reconnect ONLY on bridge change — never on handle switch
 
   return (
-    <PeerContext.Provider value={{ peer, status }}>
+    <PeerContext.Provider value={{ peer, status, node }}>
       {children}
       {/* Dev-only mesh diagnostic strip — visible even over the onboarding
           gate so connection health is observable without the console. */}
