@@ -424,7 +424,7 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 // not "3 minutes ago": nothing re-renders the header on a timer, and a relative
 // time that does not move is the frozen-number fault the footer once had.
 export function arrivalLabel(at, now = Date.now()) {
-  if (!Number.isFinite(at) || at <= 0) return 'nothing heard yet';
+  if (!Number.isFinite(at) || at <= 0) return 'nothing heard live yet';
   const d = new Date(at), n = new Date(now);
   const pad = (x) => String(x).padStart(2, '0');
   const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -436,4 +436,16 @@ export function arrivalLabel(at, now = Date.now()) {
 // relay log prints. Anything that is not a hex id shows as nothing.
 export function shortNodeId(id) {
   return (typeof id === 'string' && /^[0-9a-f]{12,}$/i.test(id)) ? id.slice(0, 12).toLowerCase() : null;
+}
+
+// Is this envelope a LIVE arrival, or history replayed after a subscribe? An
+// envelope written before this session subscribed to the topic is history: a
+// reload replays a channel's past, and stamping that as "heard now" would make
+// a channel that has heard nothing new read as fresh. SKEW_MS allows for the
+// writer's clock running behind the reader's. An envelope with no usable time
+// is counted as live: silence about its age is not evidence that it is old.
+export const ARRIVAL_SKEW_MS = 5_000;
+export function isLiveArrival(envTs, seatedAt) {
+  if (!Number.isFinite(envTs) || !Number.isFinite(seatedAt)) return true;
+  return envTs >= seatedAt - ARRIVAL_SKEW_MS;
 }

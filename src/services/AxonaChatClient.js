@@ -1,6 +1,6 @@
 import { deriveTopicId, createAuthorIdentity, metricTopic } from '@axona/protocol';
 import { makeMessage } from '@axona/protocol/std/message.js';
-import { useChatStore } from '../stores/useChatStore.js';
+import { useChatStore, isLiveArrival } from '../stores/useChatStore.js';
 import CryptoService from './CryptoService.js';
 // write defaults to 'open' to match the kernel's deriveTopicId — a
 // descriptor with and without an explicit write:'open' is the same topic
@@ -247,12 +247,15 @@ class AxonaChatClient {
     try {
       const isTicker = descriptor.name === this.tickerTopic.name;
       const isPresence = descriptor.name === this.heartbeatTopic.name;
+      const seatedAt = Date.now();   // this session's subscribe to this topic; an envelope written before it is history
 
       const sub = await peer.sub(descriptor, (envelope) => {
-        // LAST ARRIVAL (0.116.0): anything delivered on a channel, a message or
-        // a retraction, is this channel being heard. Stamped before any branch
-        // below can return. The two shared topics are not channels.
-        if (!isTicker && !isPresence) useChatStore.getState().noteArrival(getTopicId(descriptor));
+        // LAST ARRIVAL (0.116.0): a LIVE delivery on a channel, a message or a
+        // retraction, is this channel being heard. History replayed after a
+        // subscribe is not (Vega ee67400d): it would stamp NOW on a channel
+        // that has heard nothing new. Stamped before any branch below can
+        // return. The two shared topics are not channels.
+        if (!isTicker && !isPresence && isLiveArrival(envelope?.ts, seatedAt)) useChatStore.getState().noteArrival(getTopicId(descriptor));
         // Send confirmation: our own envelope arriving counts as delivered
         // ONLY while the session has peers. On a zero-peer island the local
         // node roots the topic itself and echoes the publish straight back —

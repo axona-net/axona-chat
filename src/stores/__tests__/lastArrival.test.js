@@ -10,7 +10,7 @@ globalThis.localStorage = {
   removeItem: (k) => mem.delete(k),
   clear: () => mem.clear(),
 };
-import { useChatStore, arrivalLabel, shortNodeId } from '../useChatStore.js';
+import { useChatStore, arrivalLabel, shortNodeId, isLiveArrival, ARRIVAL_SKEW_MS } from '../useChatStore.js';
 
 describe('noteArrival', () => {
   beforeEach(() => useChatStore.setState({ lastArrival: {} }));
@@ -40,9 +40,9 @@ describe('noteArrival', () => {
 describe('arrivalLabel', () => {
   const at = new Date(2026, 10, 24, 6, 21, 36).getTime();
   it('says so when nothing has been heard', () => {
-    expect(arrivalLabel(undefined)).toBe('nothing heard yet');
-    expect(arrivalLabel(0)).toBe('nothing heard yet');
-    expect(arrivalLabel(NaN)).toBe('nothing heard yet');
+    expect(arrivalLabel(undefined)).toBe('nothing heard live yet');
+    expect(arrivalLabel(0)).toBe('nothing heard live yet');
+    expect(arrivalLabel(NaN)).toBe('nothing heard live yet');
   });
   it('shows a clock time on the same day', () => {
     expect(arrivalLabel(at, new Date(2026, 10, 24, 15, 0, 0).getTime())).toBe('heard 06:21:36');
@@ -58,5 +58,23 @@ describe('shortNodeId', () => {
   });
   it('shows nothing for a value that is not a node id', () => {
     for (const v of [null, undefined, '', 'node', '8925', 12, {}]) expect(shortNodeId(v)).toBe(null);
+  });
+});
+
+describe('isLiveArrival', () => {
+  const seated = 1_000_000;
+  it('a message written after this session subscribed is live', () => {
+    expect(isLiveArrival(seated + 1, seated)).toBe(true);
+  });
+  it('history replayed after a reload is not: it must not stamp "heard" as now', () => {
+    expect(isLiveArrival(seated - 9 * 3600_000, seated)).toBe(false);
+    expect(isLiveArrival(seated - ARRIVAL_SKEW_MS - 1, seated)).toBe(false);
+  });
+  it('allows for a writer whose clock runs a little behind', () => {
+    expect(isLiveArrival(seated - ARRIVAL_SKEW_MS, seated)).toBe(true);
+  });
+  it('counts an envelope with no usable time as live', () => {
+    expect(isLiveArrival(undefined, seated)).toBe(true);
+    expect(isLiveArrival(NaN, seated)).toBe(true);
   });
 });

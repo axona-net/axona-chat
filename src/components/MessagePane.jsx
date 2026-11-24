@@ -198,7 +198,7 @@ const MessagePane = ({ onOpenModal, setReplyTarget }) => {
               }
             </span>
             <span
-              title="When this session last received anything on this channel. This is the time of ARRIVAL, not the time the newest message was written. If the count rises and this time does not move, the channel is not being fed."
+              title="When this session last received something NEW on this channel, live. History replayed when the channel was opened does not count. This is the time of ARRIVAL, not the time the newest message was written. If the count rises and this time does not move, the channel is not being fed."
               style={{
               fontSize: '0.65rem',
               padding: '1px 5px',
