@@ -40,15 +40,15 @@ describe('noteArrival', () => {
 describe('arrivalLabel', () => {
   const at = new Date(2026, 10, 24, 6, 21, 36).getTime();
   it('says so when nothing has been heard', () => {
-    expect(arrivalLabel(undefined)).toBe('nothing heard live yet');
-    expect(arrivalLabel(0)).toBe('nothing heard live yet');
-    expect(arrivalLabel(NaN)).toBe('nothing heard live yet');
+    expect(arrivalLabel(undefined)).toBe('no arrival yet');
+    expect(arrivalLabel(0)).toBe('no arrival yet');
+    expect(arrivalLabel(NaN)).toBe('no arrival yet');
   });
   it('shows a clock time on the same day', () => {
-    expect(arrivalLabel(at, new Date(2026, 10, 24, 15, 0, 0).getTime())).toBe('heard 06:21:36');
+    expect(arrivalLabel(at, new Date(2026, 10, 24, 15, 0, 0).getTime())).toBe('last arrival 06:21:36');
   });
   it('shows the date once the day has changed, so an old arrival cannot read as today', () => {
-    expect(arrivalLabel(at, new Date(2026, 10, 25, 6, 30, 0).getTime())).toBe('heard 2026-11-24 06:21:36');
+    expect(arrivalLabel(at, new Date(2026, 10, 25, 6, 30, 0).getTime())).toBe('last arrival 2026-11-24 06:21:36');
   });
 });
 

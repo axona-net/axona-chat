@@ -255,7 +255,9 @@ class AxonaChatClient {
         // subscribe is not (Vega ee67400d): it would stamp NOW on a channel
         // that has heard nothing new. Stamped before any branch below can
         // return. The two shared topics are not channels.
-        if (!isTicker && !isPresence && isLiveArrival(envelope?.ts, seatedAt)) useChatStore.getState().noteArrival(getTopicId(descriptor));
+        // ONLY THE LIVE SESSION STAMPS (Aster 8aff1137): a callback still firing
+        // from a replaced session must not refresh the new session's display.
+        if (!isTicker && !isPresence && gen === this._peerGen && isLiveArrival(envelope?.ts, seatedAt)) useChatStore.getState().noteArrival(getTopicId(descriptor));
         // Send confirmation: our own envelope arriving counts as delivered
         // ONLY while the session has peers. On a zero-peer island the local
         // node roots the topic itself and echoes the publish straight back —

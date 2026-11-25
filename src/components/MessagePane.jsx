@@ -198,7 +198,7 @@ const MessagePane = ({ onOpenModal, setReplyTarget }) => {
               }
             </span>
             <span
-              title="When this session last received something NEW on this channel, live. History replayed when the channel was opened does not count. This is the time of ARRIVAL, not the time the newest message was written. If the count rises and this time does not move, the channel is not being fed."
+              title="The last time this session received something on this channel that was not replayed history. A HEURISTIC: an arrival counts when its written time is no more than five seconds before this session subscribed, and an arrival that carries no time always counts. It is the time of arrival, not the time the newest message was written. Advisory only: nothing is rebuilt on it."
               style={{
               fontSize: '0.65rem',
               padding: '1px 5px',

@@ -420,16 +420,18 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
   window.useChatStore = useChatStore;
 }
 
-// The words shown beside a channel's count for its last arrival. A clock time,
+// The words shown beside a channel's count for its last arrival. The label
+// claims no more than it knows: "last arrival", not "live" — whether an arrival
+// is new or replayed is a heuristic (see isLiveArrival). A clock time,
 // not "3 minutes ago": nothing re-renders the header on a timer, and a relative
 // time that does not move is the frozen-number fault the footer once had.
 export function arrivalLabel(at, now = Date.now()) {
-  if (!Number.isFinite(at) || at <= 0) return 'nothing heard live yet';
+  if (!Number.isFinite(at) || at <= 0) return 'no arrival yet';
   const d = new Date(at), n = new Date(now);
   const pad = (x) => String(x).padStart(2, '0');
   const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   const sameDay = d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
-  return sameDay ? `heard ${hm}` : `heard ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`;
+  return sameDay ? `last arrival ${hm}` : `last arrival ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`;
 }
 
 // The node id as the footer shows it: the first twelve characters, the length a
